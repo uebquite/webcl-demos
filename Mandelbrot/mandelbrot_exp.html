@@ -1,15 +1,21 @@
-<html><head>
-<TITLE>The Mandelbrot set explorer</TITLE>
+<!--
+    Based on: http://www.ibiblio.org/e-notes/webcl/mandelbrot_exp.html
+-->
+
+<html>
+<head>
+<title>The Mandelbrot set explorer</title>
 
 <script src="cl_gl.js" type="text/javascript"></script>
 
 <script id="clProgramMandelbrot" type="text/x-opencl">
 
-  int iClamp(int i){
-    return min( max( 0, i), 255 );
-  }
+int iClamp(int i)
+{
+  return min(max(0, i), 255);
+}
 
-  __kernel void ckMandelbrot(__global uchar4* col,
+__kernel void ckMandelbrot(__global uchar4* col,
       float scale, float Ro, float Io){
     ushort x = get_global_id(0),  y = get_global_id(1);
 
@@ -179,65 +185,79 @@
        255);
     }
   }
-</script>          
-            
-<script type="text/javascript"> 
+</script>
 
-function loadKernel ( id ){
-   var shaderScript = document.getElementById ( id );
+<script type="text/javascript">
+
+function getKernel(id) {
+   var shaderScript = document.getElementById(id);
    var str = "";
    var k = shaderScript.firstChild;
-   while ( k ){
-     if ( k.nodeType == 3 ) str += k.textContent;
+   while (k) {
+     if (k.nodeType == 3) str += k.textContent;
      k = k.nextSibling;
    }
    return str;
 }
 
-var ctx_c, nx = 512, ny = 512, imgd,  scale = .01, zoom = 1.01, zoom2 = 1.05,
+var ctx_c, imgd, scale = .01, zoom = 1.01, zoom2 = 1.05,
     Ro = .37014983130958534, Io = .10511722270082503, dR = -Ro, dI = -Io,
     animation = "animate", time, frames = 0, delay = 0;
-var program, kernel, cmdQueue, bufCol, outBuffer,
-    localWS = [8,8], globalWS = [ nx, ny ];
+var program, kernel, cmdQueue, bufCol, outBuffer, bufSize;
+var globalWS = new Int32Array(2);
 
 function CL_mandelbrot () {
+  var canvas = document.getElementById("c");
+  canvas.addEventListener('mouseup', ev_mouseup, false);
+
+  init_gl(canvas);
+
+  nx = canvas.width;
+  ny = canvas.height;
+
+  bufSize = 4 * nx * ny;
+
   try {
-    if (window.WebCL == undefined) {
+    if (typeof(webcl) === undefined) {
       alert("Unfortunately your system does not support WebCL");
       return false;
     }
-    var platforms = WebCL.getPlatformIDs();
-    var ctx = WebCL.createContextFromType ([WebCL.CL_CONTEXT_PLATFORM, 
-        platforms[0]], WebCL.CL_DEVICE_TYPE_DEFAULT);
-    var devices = ctx.getContextInfo(WebCL.CL_CONTEXT_DEVICES);
-                     
-    var kernelSrc = loadKernel("clProgramMandelbrot");
-    program = ctx.createProgramWithSource(kernelSrc);
+    var platforms = webcl.getPlatforms();
+    var platform = platforms[0];
+    var devices = platform.getDevices(webcl.DEVICE_TYPE_GPU);
+    var device = devices[0];
+    var contextProperties = {platform: platform, devices: devices, deviceType: webcl.DEVICE_TYPE_GPU, shareGroup: 1, hint: null};
+    var ctx = webcl.createContext(contextProperties);
+
+    var kernelSrc = getKernel("clProgramMandelbrot");
+    program = ctx.createProgram(kernelSrc);
+
     try {
-      program.buildProgram ([devices[0]], "");
+      program.build(devices);
     } catch(e) {
       alert ("Failed to build WebCL program. Error "
-        + program.getProgramBuildInfo (devices[0], 
-          WebCL.CL_PROGRAM_BUILD_STATUS)
-        + ":  " + program.getProgramBuildInfo (devices[0], 
-          WebCL.CL_PROGRAM_BUILD_LOG));
+        + program.getBuildInfo(device,
+          webcl.PROGRAM_BUILD_STATUS)
+        + ":  " + program.getBuildInfo (device,
+          webcl.PROGRAM_BUILD_LOG));
       throw e;
     }
-    bufCol = ctx.createBuffer (WebCL.CL_MEM_WRITE_ONLY, 4*nx*ny);
-    kernel = program.createKernel ("ckManZ2sm");
-    kernel.setKernelArg (0, bufCol);
-            
-    cmdQueue = ctx.createCommandQueue (devices[0], 0);
-    
-    outBuffer = new Uint8Array(4*4*nx*ny);
+    bufCol = ctx.createBuffer(webcl.MEM_WRITE_ONLY, bufSize);
+    kernel = program.createKernel("ckManZ2sm");
+
+    globalWS[0] = nx;
+    globalWS[1] = ny;
+
+    kernel.setArg (0, bufCol);
+
+    cmdQueue = ctx.createCommandQueue(device);
+
+    outBuffer = new Uint8Array(4 * bufSize);
   } catch(e) {
-    document.getElementById("output").innerHTML 
-      += "<h3>ERROR:</h3><pre style=\"color:red;\">" + e.message + "</pre>";
+    console.error("ERROR: " + e.message);
     throw e;
   }
-  var canvas = document.getElementById("c");
-  canvas.addEventListener('mouseup', ev_mouseup, false);
-  init_gl(canvas);
+
   time = new Date().getTime();
   setInterval(fr, 500);
   anim();
@@ -263,25 +283,27 @@ function CL_mandelbrot () {
 function draw() {
   scale /= zoom;
   dR /= zoom2;  dI /= zoom2;
-  kernel.setKernelArg (1, scale, WebCL.types.FLOAT);
-  kernel.setKernelArg (2, Ro + dR, WebCL.types.FLOAT);
-  kernel.setKernelArg (3, Io + dI, WebCL.types.FLOAT);
-  cmdQueue.enqueueNDRangeKernel(kernel, 2, [], globalWS, localWS, []);
-  cmdQueue.flush ();
-  cmdQueue.enqueueReadBuffer (bufCol, true, 0, 4*nx*ny, outBuffer, []);    
+  kernel.setArg (1, scale, WebCLKernelArgumentTypes.FLOAT);
+  kernel.setArg (2, Ro + dR, WebCLKernelArgumentTypes.FLOAT);
+  kernel.setArg (3, Io + dI, WebCLKernelArgumentTypes.FLOAT);
+  cmdQueue.enqueueNDRangeKernel(kernel, null, globalWS, null);
+  cmdQueue.enqueueReadBuffer(bufCol, true, 0, bufSize, outBuffer);
+  cmdQueue.finish();
   draw_gl(nx, ny, outBuffer);
   frames++;
 }
 function anim(v) {
-  if( animation == "animate" ){
+  if( animation === "animate" ){
      draw();
-     if (delay == 0) requestAnimFrame(anim);
-     else setTimeout("requestAnimFrame(anim)", delay);
+     if (delay === 0) {
+        requestAnimationFrame(anim);
+    }
+     else setTimeout("requestAnimationFrame(anim)", delay);
   }
 }
 function setFormula(s) {
-   kernel = program.createKernel ( s );
-   kernel.setKernelArg (0, bufCol);
+   kernel = program.createKernel(s);
+   kernel.setArg(0, bufCol);
    scale = .01;
    if(animation == "stop"){
      animation = "animate";
@@ -314,7 +336,7 @@ function fr(){
   document.getElementById("framerate").value = fps;
   frames = 0;  time = ti;
 }
-</script> 
+</script>
 <style type="text/css">
   H1{ font-size: 120%; color: green}
   H2{ font-size: 100%; color: green}
@@ -323,7 +345,7 @@ function fr(){
 </style>
 </style>
 </head>
-<body onload="CL_mandelbrot()"> 
+<body onload="CL_mandelbrot()">
 
 <canvas id="c" width="512" height="512" ></canvas>
 
@@ -342,11 +364,4 @@ formula<select onchange="setFormula(this.options[this.selectedIndex].value)">
    <option value="ckManZ4">z^4
    <option value="ckMakin">Makin
    </select>
-
-<br>The Mandelbrot set explorer lite (with single preccision floats).
-<br>Click mouse to explore it. Use mouse wheel to change zoom speed.
-
-<hr><a href="webcl.htm">WebCL Demos</a>
-&nbsp; &nbsp; <i>updated</i> 12 June 2011
-
 </body></html>

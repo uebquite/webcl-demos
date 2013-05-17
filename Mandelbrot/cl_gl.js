@@ -1,11 +1,12 @@
-//  requestAnimFrame( callback );
-//  init_gl( canvas );
-//  draw_gl( nx, ny, pixels );
+//Based on: http://www.ibiblio.org/e-notes/webcl/cl_gl.js
 
-requestAnimFrame = (function(){
-  return  window.webkitRequestAnimationFrame ||
-    window.mozRequestAnimationFrame ||
-    function(callback, element){ window.setTimeout(callback, 1000 / 60); }
+requestAnimationFrame = (function() {
+  return window.webkitRequestAnimationFrame ||
+  window.mozRequestAnimationFrame ||
+  function(callback, element) {
+    window.setTimeout( callback, 1000 / 60 );
+  };
+
 })();
 
 function init_gl( canvas ) {
@@ -58,7 +59,7 @@ function init_gl( canvas ) {
    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);    
+   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 }
 
 function draw_gl(nx, ny, pixels) {
