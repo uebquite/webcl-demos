@@ -55,6 +55,7 @@ function log(msg) {
 //
 function simpleSetup(gl, vshader, fshader, attribs, clearColor, clearDepth)
 {
+
     // create our shaders
     var vertexShader = loadShader(gl, vshader);
     var fragmentShader = loadShader(gl, fshader);
@@ -78,7 +79,6 @@ function simpleSetup(gl, vshader, fshader, attribs, clearColor, clearDepth)
     if (!linked && !gl.isContextLost()) {
         // something went wrong with the link
         var error = gl.getProgramInfoLog (program);
-        log("Error in program linking:"+error);
 
         gl.deleteProgram(program);
         gl.deleteProgram(fragmentShader);
@@ -86,6 +86,7 @@ function simpleSetup(gl, vshader, fshader, attribs, clearColor, clearDepth)
 
         return null;
     }
+
 
     gl.useProgram(program);
 
@@ -133,10 +134,10 @@ function loadShader(ctx, shaderId)
 
     // Check the compile status
     var compiled = ctx.getShaderParameter(shader, ctx.COMPILE_STATUS);
-    if (!compiled && !ctx.isContextLost()) {
+    if (!compiled) {
         // Something went wrong during compilation; get the error
         var error = ctx.getShaderInfoLog(shader);
-        log("*** Error compiling shader '"+shaderId+"':"+error);
+        console.error("shader", shaderId, [error]);
         ctx.deleteShader(shader);
         return null;
     }
