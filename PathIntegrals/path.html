@@ -152,22 +152,41 @@ function loadKernel ( id ){
 }
 
 var gl;
-var ctx_c, n = 1024, it = 10, ev,
+var ctx_c, n = 1024, it = 10, ev, bufferSize = 4*4*n,
     frames = 0, animation = "animate", time, delay = 0;
 var kPath, kPix, kPixXY, kPixXT, kPixYT, cmdQueue, iPath, iPath1,
     bufPix, outBuffer;
+var types = WebCLKernelArgumentTypes;
 
 function CL_start() {
+
+  window.WebCL = webcl;
+
   try {
     if (window.WebCL == undefined) {
       alert("Unfortunately your system does not support WebCL");
       return false;
     }
-    var platforms = WebCL.getPlatformIDs();
-    var ctx = WebCL.createContextFromType ([WebCL.CL_CONTEXT_PLATFORM,
-       platforms[0]], WebCL.CL_DEVICE_TYPE_DEFAULT);
-    var devices = ctx.getContextInfo(WebCL.CL_CONTEXT_DEVICES);
 
+    var platforms = WebCL.getPlatforms();
+    if(platforms.length === 0) {
+        alert("No platforms available");
+        return;
+    }
+
+    var platform = platforms[0];
+
+    var platDevices = platform.getDevices(WebCL.DEVICE_TYPE_GPU);
+    if(platDevices.length === 0) {
+        alert("No devices available");
+        return;
+    }
+
+    var device = platDevices[0];
+    var contextProperties = {platform: platform, devices: device,
+                             deviceType: WebCL.DEVICE_TYPE_ALL, shareGroup: 0, hint: null};
+
+    var context = WebCL.createContext(contextProperties);
     var UIrand = new Uint32Array(4*n);
     for ( var i = 0; i < 4*n;  i++ )
       UIrand[i] = Math.floor(Math.random() * 4294967295);
@@ -178,44 +197,54 @@ function CL_start() {
       for ( var i = 0; i < n;  i++ ){
         path[j + 8*i] = x0;  path[j + 1 + 8*i] = y0;}
     }
-    var bufRand = ctx.createBuffer (WebCL.CL_MEM_READ_WRITE, 4*4*n);
-    var format={channelOrder:WebCL.CL_RG, channelDataType:WebCL.CL_FLOAT};
-    iPath  = ctx.createImage2D(WebCL.CL_MEM_READ_WRITE, format, 4, n, 0);
-    iPath1 = ctx.createImage2D(WebCL.CL_MEM_READ_WRITE, format, 4, n, 0);
-    bufPix  = ctx.createBuffer (WebCL.CL_MEM_WRITE_ONLY, 4*2*4*n);
+    var bufRand = context.createBuffer (WebCL.MEM_READ_WRITE, bufferSize);
+
+    // FIXME: According to WebCL spec from May-14,2013 the WebCLImageDescriptor
+    // dictionary has channelType as second parameter instead of channelDataType,
+    // but if we use it we got INVALID_IMAGE_FORMAT_DESCRIPTOR error.
+
+    var descriptor = {channelOrder:WebCL.RG, channelDataType:types.FLOAT,
+                      width:4, height:n, rowPitch:0};
+    iPath  = context.createImage(WebCL.MEM_READ_WRITE, descriptor);
+    iPath1 = context.createImage(WebCL.MEM_READ_WRITE, descriptor);
+    bufPix = context.createBuffer (WebCL.MEM_WRITE_ONLY, bufferSize*2);
 
     var kernelSrc = loadKernel("clProg");
-    var program = ctx.createProgramWithSource(kernelSrc);
+    var program = context.createProgram(kernelSrc);
     try {
-      program.buildProgram ([devices[0]], "");
+      program.build(device, "");
     } catch(e) {
       alert ("Failed to build WebCL program. Error "
-        + program.getProgramBuildInfo (devices[0],
-           WebCL.CL_PROGRAM_BUILD_STATUS)
-        + ":  " + program.getProgramBuildInfo (devices[0],
-           WebCL.CL_PROGRAM_BUILD_LOG));
+       + program.getBuildInfo (device, WebCL.PROGRAM_BUILD_STATUS)
+       + ":  " + program.getBuildInfo (device, WebCL.CL_PROGRAM_BUILD_LOG));
       throw e;
     }
+
     kPath = program.createKernel("kPath");
-    kPath.setKernelArg(1, bufRand);
-    kPath.setKernelArg(4, .01, WebCL.types.FLOAT);
+    kPath.setArg(1, bufRand);
+    kPath.setArg(4, .01, types.FLOAT);
     kPixXY = program.createKernel("kPixXY");
-    kPixXY.setKernelArg(0, iPath);
-    kPixXY.setKernelArg(1, iPath1);
-    kPixXY.setKernelArg(2, bufPix);
+    kPixXY.setArg(0, iPath);
+    kPixXY.setArg(1, iPath1);
+    kPixXY.setArg(2, bufPix);
     kPixXT = program.createKernel("kPixXT");
-    kPixXT.setKernelArg(0, iPath);
-    kPixXT.setKernelArg(1, iPath1);
-    kPixXT.setKernelArg(2, bufPix);
+    kPixXT.setArg(0, iPath);
+    kPixXT.setArg(1, iPath1);
+    kPixXT.setArg(2, bufPix);
     kPixYT = program.createKernel("kPixYT");
-    kPixYT.setKernelArg(0, iPath);
-    kPixYT.setKernelArg(1, iPath1);
-    kPixYT.setKernelArg(2, bufPix);
+    kPixYT.setArg(0, iPath);
+    kPixYT.setArg(1, iPath1);
+    kPixYT.setArg(2, bufPix);
     kPix = kPixXY;
-    cmdQueue = ctx.createCommandQueue (devices[0], 0);
-    cmdQueue.enqueueWriteImage(iPath, true, [0,0,0], [4,n,1], 0, 0, path, []);
-    cmdQueue.enqueueWriteImage(iPath1,true, [0,0,0], [4,n,1], 0, 0, path, []);
-    ev = cmdQueue.enqueueWriteBuffer(bufRand, true, 0, 4*4*n, UIrand, []);
+    cmdQueue = context.createCommandQueue (device, 0);
+
+    var origin = new Int32Array([0,0,0]);
+    var region = new Int32Array([4,n,1]);
+    var hostRowPitch = new Uint32Array([0]);
+
+    cmdQueue.enqueueWriteImage(iPath, true, origin, region, hostRowPitch, path);
+    cmdQueue.enqueueWriteImage(iPath1, true, origin, region, hostRowPitch, path);
+    ev = cmdQueue.enqueueWriteBuffer(bufRand, true, 0, bufferSize, UIrand);
   } catch(e) {
     document.getElementById("output").innerHTML
       += "<h3>ERROR:</h3><pre style=\"color:red;\">" + e.message + "</pre>";
@@ -229,23 +258,30 @@ function CL_start() {
 }
 function draw(){
   for ( var i = 0; i < it;  i++ ){
-   kPath.setKernelArg(0, iPath);
-   kPath.setKernelArg(2, iPath1);
-   kPath.setKernelArg(3, 0, WebCL.types.INT);
-   ev = cmdQueue.enqueueNDRangeKernel(kPath, 2, [], [4,n], [4,8], [ev]);
+   kPath.setArg(0, iPath);
+   kPath.setArg(2, iPath1);
+   kPath.setArg(3, 0, types.INT);
+
+   var globalWorkSize = new Int32Array([4,n]);
+   var localWorkSize = new Int32Array([4,8]);
+
+   ev = cmdQueue.enqueueNDRangeKernel(kPath, [], globalWorkSize, localWorkSize);
    cmdQueue.flush();
-   kPath.setKernelArg(0, iPath1);
-   kPath.setKernelArg(2, iPath);
-   kPath.setKernelArg(3, 1, WebCL.types.INT);
-   ev = cmdQueue.enqueueNDRangeKernel(kPath, 2, [], [4,n], [4,8], [ev]);
+   kPath.setArg(0, iPath1);
+   kPath.setArg(2, iPath);
+   kPath.setArg(3, 1, types.INT);
+   ev = cmdQueue.enqueueNDRangeKernel(kPath, [], globalWorkSize, localWorkSize);
    cmdQueue.flush();
   }
   drawPix();
   frames++;
 }
 function drawPix(){
-  cmdQueue.enqueueNDRangeKernel(kPix, 2, [], [4,n], [1,8], []);
-  cmdQueue.enqueueReadBuffer(bufPix, true, 0, 4*8*n, outBuffer, []);
+  var globalWorkSize = new Int32Array([4,n]);
+  var localWorkSize  = new Int32Array([1,8]);
+
+  cmdQueue.enqueueNDRangeKernel(kPix, [], globalWorkSize, localWorkSize);
+  cmdQueue.enqueueReadBuffer(bufPix, true, 0, bufferSize*2, outBuffer);
   gl.clear(gl.COLOR_BUFFER_BIT);
   gl.bufferData(gl.ARRAY_BUFFER, outBuffer, gl.STATIC_DRAW);
 
@@ -270,8 +306,11 @@ function anim(){
         for ( var i = 0; i < n;  i++ ){
           path[j + 8*i] = x0;  path[j + 1 + 8*i] = y0;}
       }
-      cmdQueue.enqueueWriteImage(iPath, true, [0,0,0], [4,n,1], 0, 0, path, []);
-      cmdQueue.enqueueWriteImage(iPath1,true, [0,0,0], [4,n,1], 0, 0, path, []);
+      var origin = new Int32Array([0,0,0]);
+      var region = new Int32Array([4,n,1]);
+      var hostRowPitch = new Uint32Array([0]);
+      cmdQueue.enqueueWriteImage(iPath, true, origin, region, hostRowPitch, path);
+      cmdQueue.enqueueWriteImage(iPath1, true, origin, region, hostRowPitch, path);
       animation = "animate";
      case "animate":
        if (delay == 0) requestAnimFrame(anim);
@@ -309,7 +348,7 @@ function fr(){
 }
 function setGa(v){
   var g = v.valueOf();
-  kPath.setKernelArg(4, g, WebCL.types.FLOAT);
+  kPath.setKernelArg(4, g, types.FLOAT);
 }
 function setIt(val) {
   it = parseInt(val);
@@ -342,41 +381,5 @@ plane:
 <input type="radio" name="p" onchange="setPlane( this.value )" value="xy" checked >xy
 <input type="radio" name="p" onchange="setPlane( this.value )" value="xt">xt
 <input type="radio" name="p" onchange="setPlane( this.value )" value="yt">yt
-<br>GPU based Monte-Carlo simulation of the 4 Path Integrals for free
-particles (<i>n = 1024</i>). <i>it</i> is the number of MC iterations per frame.
-The thermostat algorithm and linear congruential random number generator are
-used. To simplify visualization paths are clamped to (<i>0,1</i>) interval.
-Really it is just closed random walks on torus.
-
-<p><i>draft</i>
-
-<h1>Path Integral for free particles</h1>
-
-&nbsp; &nbsp; <i>W = Z<sup> -1</sup> e<sup>-&beta;E</sup>, &nbsp; &nbsp;
-&beta; = 1/T,
-<br>&nbsp; &nbsp; E = &Sum;<sub> i</sub> (x<sub>i+1</sub> + x<sub>i
- </sub>)<sup>2</sup>/n.</i>
-<br>In one MC pass we concider only even or odd (independent) beads.
-Let for <i>x<sub>i</sub></i> bead
-<br>&nbsp; &nbsp; <i>x<sub>o</sub> = (x<sub>i+1</sub> + x<sub>i-1 </sub>)/2,
-&nbsp; &nbsp; &Delta; = (x<sub>i+1</sub> - x<sub>i-1 </sub>)/2,
-<br>&nbsp; &nbsp; x<sub>i+1</sub> = x<sub>o</sub> + &Delta;,
-&nbsp; &nbsp; x<sub>i-1</sub> = x<sub>o</sub> - &Delta;.</i>
-<br>Then
-<br>&nbsp; &nbsp; <i>&epsilon; = (x<sub>i</sub> - x<sub>i+1 </sub>)<sup>2</sup>
-+ (x<sub>i</sub> - x<sub>i-1 </sub>)<sup>2</sup> =
-(x<sub>i</sub> - x<sub>o</sub> + &Delta;)<sup>2</sup> + (x<sub>i</sub> -
-x<sub>o</sub> - &Delta;)<sup>2</sup> =
-2(&delta;<sup>2</sup> + &Delta;<sup>2</sup>)</i>,
-<br>where <i>&delta; = x<sub>i</sub> - x<sub>o</sub></i> and
-<br>&nbsp; &nbsp; <i>w ~ e<sup>-2&beta;&delta;<sup>2</sup></sup></i>.
-<br>We use random perturbation in every bead
-<br>&nbsp; &nbsp; <i>&delta; = &gamma;(&Sum;<sub> k</sub><sup>6</sup>
-R<sub>k</sub> - 3)</i>
-<br>to generate random path.
-
-
-<hr><a href="../webcl.htm">WebCL Demos</a>
-&nbsp; &nbsp; <i>updated</i> 30 Oct 2011
 
 </body></html>
