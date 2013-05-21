@@ -1,0 +1,385 @@
+<html><head>
+<TITLE>Path Integrals</TITLE>
+
+<script id="clProg" type="text/x-opencl">
+
+constant int n = 1024;
+constant float h = 1.0f/1024.0f, c = 8.0f/4294967295.0f;
+
+__kernel void kPath(read_only image2d_t p, global uint* rand,
+  write_only image2d_t p1, int bw, float ga ) {
+  const sampler_t samp =
+    CLK_NORMALIZED_COORDS_TRUE|CLK_ADDRESS_REPEAT|CLK_FILTER_NEAREST;
+  int ix = get_global_id(0),  iy = get_global_id(1);
+  if ( (iy & 1) == bw) return;
+
+  int t = ix + 4*iy;
+  uint sum = 0;
+  uint r = 1664525u * rand[t] + 1013904223u;  sum += (r >> 3);
+  r = 1664525u * r + 1013904223u;  sum += (r >> 3);
+  r = 1664525u * r + 1013904223u;  sum += (r >> 3);
+  r = 1664525u * r + 1013904223u;  sum += (r >> 3);
+  r = 1664525u * r + 1013904223u;  sum += (r >> 3);
+  r = 1664525u * r + 1013904223u;  sum += (r >> 3);
+  float dx = (sum*c -3.0f)*ga;
+  sum = 0;
+  r = 1664525u * r + 1013904223u;  sum += (r >> 3);
+  r = 1664525u * r + 1013904223u;  sum += (r >> 3);
+  r = 1664525u * r + 1013904223u;  sum += (r >> 3);
+  r = 1664525u * r + 1013904223u;  sum += (r >> 3);
+  r = 1664525u * r + 1013904223u;  sum += (r >> 3);
+  r = 1664525u * r + 1013904223u;  sum += (r >> 3);
+  float dy = (sum*c -3.0f)*ga;
+  rand[t] = r;
+  float x = .25f*(ix + .5f),  y = h*(iy + .5f);
+  float2 p_new = (read_imagef(p, samp, (float2)(x, y + h) ).xy +
+    read_imagef(p, samp, (float2)(x, y - h) ).xy)*.5f + (float2)(dx, dy);
+  p_new = fmin(fmax(p_new, 0.0f), 1.0f);
+  write_imagef(p1, (int2)(ix, iy), (float4)( p_new, 0.0f, 0.0f) );
+}
+
+__kernel void kPixXY(read_only image2d_t p, read_only image2d_t p1,
+    global float2* pix) {
+  const sampler_t samp =
+    CLK_NORMALIZED_COORDS_FALSE|CLK_ADDRESS_CLAMP|CLK_FILTER_NEAREST;
+  int x = get_global_id(0),  y = get_global_id(1);
+  float2 c;
+  if ( (y & 1) == 0) c = read_imagef(p, samp, (int2)(x, y) ).xy;
+  else c = read_imagef(p1, samp, (int2)(x, y) ).xy;
+  pix[y + n*x] = 2.0f*c - 1.0f;
+}
+
+__kernel void kPixXT(read_only image2d_t p, read_only image2d_t p1,
+    global float2* pix) {
+  const sampler_t samp =
+    CLK_NORMALIZED_COORDS_FALSE|CLK_ADDRESS_CLAMP|CLK_FILTER_NEAREST;
+  int x = get_global_id(0),  y = get_global_id(1);
+  float c;
+  if ( (y & 1) == 0) c = read_imagef(p, samp, (int2)(x, y) ).x;
+  else c = read_imagef(p1, samp, (int2)(x, y) ).x;
+  pix[y + n*x] = 2.0f*(float2)(c, h*y) - 1.0f;
+}
+
+__kernel void kPixYT(read_only image2d_t p, read_only image2d_t p1,
+    global float2* pix) {
+  const sampler_t samp =
+    CLK_NORMALIZED_COORDS_FALSE|CLK_ADDRESS_CLAMP|CLK_FILTER_NEAREST;
+  int x = get_global_id(0),  y = get_global_id(1);
+  float c;
+  if ( (y & 1) == 0) c = read_imagef(p, samp, (int2)(x, y) ).y;
+  else c = read_imagef(p1, samp, (int2)(x, y) ).y;
+  pix[y + n*x] = 2.0f*(float2)(c, h*y) - 1.0f;
+}
+</script>
+
+<script id="line-vs" type="x-shader/x-vertex">
+  attribute vec2 aPos;
+void main(void) {
+   gl_Position = vec4( aPos, 0., 1.);
+}
+</script>
+
+<script id="line-fs" type="x-shader/x-fragment">
+#ifdef GL_ES
+precision highp float;
+#endif
+  uniform vec4 color;
+void main(void) {
+   gl_FragColor = color;
+}
+</script>
+
+<script type="text/javascript">
+
+function getShader ( gl, id ){
+   var shaderScript = document.getElementById ( id );
+   var str = "";
+   var k = shaderScript.firstChild;
+   while ( k ){
+     if ( k.nodeType == 3 ) str += k.textContent;
+     k = k.nextSibling;
+   }
+   var shader;
+   if ( shaderScript.type == "x-shader/x-fragment" )
+           shader = gl.createShader ( gl.FRAGMENT_SHADER );
+   else if ( shaderScript.type == "x-shader/x-vertex" )
+           shader = gl.createShader(gl.VERTEX_SHADER);
+   else return null;
+   gl.shaderSource(shader, str);
+   gl.compileShader(shader);
+   if (gl.getShaderParameter(shader, gl.COMPILE_STATUS) == 0)
+      alert(gl.getShaderInfoLog(shader));
+   return shader;
+}
+
+var colLoc;
+function initGL() {
+   var canvas = document.getElementById("c");
+   if (!window.WebGLRenderingContext){
+     alert("Your browser does not support WebGL. See http://get.webgl.org");
+     return;}
+   try { gl = canvas.getContext("experimental-webgl");
+   } catch(e) {}
+   if ( !gl ) {alert("Can't get WebGL"); return;}
+   var line_prog  = gl.createProgram();
+   gl.attachShader(line_prog, getShader( gl, "line-vs" ));
+   gl.attachShader(line_prog, getShader( gl, "line-fs" ));
+   gl.linkProgram(line_prog);
+   var lineLoc = gl.getAttribLocation(line_prog, "aPos");
+   colLoc  = gl.getUniformLocation(line_prog, "color");
+   var line_buf = gl.createBuffer();
+   gl.bindBuffer(gl.ARRAY_BUFFER, line_buf);
+   gl.vertexAttribPointer(lineLoc, 2, gl.FLOAT, false, 0, 0);
+   gl.useProgram(line_prog);
+   gl.clearColor(1,1,1, 1);
+   gl.enableVertexAttribArray( lineLoc );
+}
+requestAnimFrame = (function(){
+  return  window.webkitRequestAnimationFrame ||
+    window.mozRequestAnimationFrame ||
+    function(callback, element){ window.setTimeout(callback, 1000 / 60); }
+})();
+
+function loadKernel ( id ){
+   var shaderScript = document.getElementById ( id );
+   var str = "";
+   var k = shaderScript.firstChild;
+   while ( k ){
+     if ( k.nodeType == 3 ) str += k.textContent;
+     k = k.nextSibling;
+   }
+   return str;
+}
+
+var gl;
+var ctx_c, n = 1024, it = 10, ev, bufferSize = 4*4*n,
+    frames = 0, animation = "animate", time, delay = 0;
+var kPath, kPix, kPixXY, kPixXT, kPixYT, cmdQueue, iPath, iPath1,
+    bufPix, outBuffer;
+var types = WebCLKernelArgumentTypes;
+
+function CL_start() {
+
+  window.WebCL = webcl;
+
+  try {
+    if (window.WebCL == undefined) {
+      alert("Unfortunately your system does not support WebCL");
+      return false;
+    }
+
+    var platforms = WebCL.getPlatforms();
+    if(platforms.length === 0) {
+        alert("No platforms available");
+        return;
+    }
+
+    var platform = platforms[0];
+
+    var platDevices = platform.getDevices(WebCL.DEVICE_TYPE_GPU);
+    if(platDevices.length === 0) {
+        alert("No devices available");
+        return;
+    }
+
+    var device = platDevices[0];
+    var contextProperties = {platform: platform, devices: device,
+                             deviceType: WebCL.DEVICE_TYPE_ALL, shareGroup: 0, hint: null};
+
+    var context = WebCL.createContext(contextProperties);
+    var UIrand = new Uint32Array(4*n);
+    for ( var i = 0; i < 4*n;  i++ )
+      UIrand[i] = Math.floor(Math.random() * 4294967295);
+    var path = new Float32Array(4*2*n);
+    var x0, y0;
+    for ( var j = 0; j < 8;  j += 2 ){
+      x0 = Math.random();   y0 = Math.random();
+      for ( var i = 0; i < n;  i++ ){
+        path[j + 8*i] = x0;  path[j + 1 + 8*i] = y0;}
+    }
+    var bufRand = context.createBuffer (WebCL.MEM_READ_WRITE, bufferSize);
+
+    // FIXME: According to WebCL spec from May-14,2013 the WebCLImageDescriptor
+    // dictionary has channelType as second parameter instead of channelDataType,
+    // but if we use it we got INVALID_IMAGE_FORMAT_DESCRIPTOR error.
+
+    var descriptor = {channelOrder:WebCL.RG, channelDataType:types.FLOAT,
+                      width:4, height:n, rowPitch:0};
+    iPath  = context.createImage(WebCL.MEM_READ_WRITE, descriptor);
+    iPath1 = context.createImage(WebCL.MEM_READ_WRITE, descriptor);
+    bufPix = context.createBuffer (WebCL.MEM_WRITE_ONLY, bufferSize*2);
+
+    var kernelSrc = loadKernel("clProg");
+    var program = context.createProgram(kernelSrc);
+    try {
+      program.build(device, "");
+    } catch(e) {
+      alert ("Failed to build WebCL program. Error "
+       + program.getBuildInfo (device, WebCL.PROGRAM_BUILD_STATUS)
+       + ":  " + program.getBuildInfo (device, WebCL.CL_PROGRAM_BUILD_LOG));
+      throw e;
+    }
+
+    kPath = program.createKernel("kPath");
+    kPath.setArg(1, bufRand);
+    kPath.setArg(4, .01, types.FLOAT);
+    kPixXY = program.createKernel("kPixXY");
+    kPixXY.setArg(0, iPath);
+    kPixXY.setArg(1, iPath1);
+    kPixXY.setArg(2, bufPix);
+    kPixXT = program.createKernel("kPixXT");
+    kPixXT.setArg(0, iPath);
+    kPixXT.setArg(1, iPath1);
+    kPixXT.setArg(2, bufPix);
+    kPixYT = program.createKernel("kPixYT");
+    kPixYT.setArg(0, iPath);
+    kPixYT.setArg(1, iPath1);
+    kPixYT.setArg(2, bufPix);
+    kPix = kPixXY;
+    cmdQueue = context.createCommandQueue (device, 0);
+
+    var origin = new Int32Array([0,0,0]);
+    var region = new Int32Array([4,n,1]);
+    var hostRowPitch = new Uint32Array([0]);
+
+    cmdQueue.enqueueWriteImage(iPath, true, origin, region, hostRowPitch, path);
+    cmdQueue.enqueueWriteImage(iPath1, true, origin, region, hostRowPitch, path);
+    ev = cmdQueue.enqueueWriteBuffer(bufRand, true, 0, bufferSize, UIrand);
+  } catch(e) {
+    document.getElementById("output").innerHTML
+      += "<h3>ERROR:</h3><pre style=\"color:red;\">" + e.message + "</pre>";
+    throw e;
+  }
+  initGL();
+  outBuffer = new Float32Array(4*2*n);
+  time = new Date().getTime();
+  setInterval(fr, 500);
+  anim();
+}
+function draw(){
+  for ( var i = 0; i < it;  i++ ){
+   kPath.setArg(0, iPath);
+   kPath.setArg(2, iPath1);
+   kPath.setArg(3, 0, types.INT);
+
+   var globalWorkSize = new Int32Array([4,n]);
+   var localWorkSize = new Int32Array([4,8]);
+
+   ev = cmdQueue.enqueueNDRangeKernel(kPath, [], globalWorkSize, localWorkSize);
+   cmdQueue.flush();
+   kPath.setArg(0, iPath1);
+   kPath.setArg(2, iPath);
+   kPath.setArg(3, 1, types.INT);
+   ev = cmdQueue.enqueueNDRangeKernel(kPath, [], globalWorkSize, localWorkSize);
+   cmdQueue.flush();
+  }
+  drawPix();
+  frames++;
+}
+function drawPix(){
+  var globalWorkSize = new Int32Array([4,n]);
+  var localWorkSize  = new Int32Array([1,8]);
+
+  cmdQueue.enqueueNDRangeKernel(kPix, [], globalWorkSize, localWorkSize);
+  cmdQueue.enqueueReadBuffer(bufPix, true, 0, bufferSize*2, outBuffer);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.bufferData(gl.ARRAY_BUFFER, outBuffer, gl.STATIC_DRAW);
+
+  gl.uniform4f(colLoc, 0,0,0,1);
+  gl.drawArrays(gl.LINE_STRIP, 0, n);
+  gl.uniform4f(colLoc, 1,0,0,1);
+  gl.drawArrays(gl.LINE_STRIP, n, n);
+  gl.uniform4f(colLoc, 0,1,0,1);
+  gl.drawArrays(gl.LINE_STRIP, 2*n, n);
+  gl.uniform4f(colLoc, 0,0,1,1);
+  gl.drawArrays(gl.LINE_STRIP, 3*n, n);
+  gl.flush();
+}
+function anim(){
+   draw();
+   switch ( animation ){
+     case "reset":
+      var path = new Float32Array(8*n);
+      var x0, y0;
+      for ( var j = 0; j < 8;  j += 2 ){
+        x0 = Math.random();   y0 = Math.random();
+        for ( var i = 0; i < n;  i++ ){
+          path[j + 8*i] = x0;  path[j + 1 + 8*i] = y0;}
+      }
+      var origin = new Int32Array([0,0,0]);
+      var region = new Int32Array([4,n,1]);
+      var hostRowPitch = new Uint32Array([0]);
+      cmdQueue.enqueueWriteImage(iPath, true, origin, region, hostRowPitch, path);
+      cmdQueue.enqueueWriteImage(iPath1, true, origin, region, hostRowPitch, path);
+      animation = "animate";
+     case "animate":
+       if (delay == 0) requestAnimFrame(anim);
+       else setTimeout("requestAnimFrame(anim)", delay);
+       break;
+     case "stop":
+       break;
+   }
+}
+function run(v) {
+  if( animation == "animate" ){
+    animation = "stop";
+    document.getElementById('runBtn').value = "Run ";}
+  else{
+    animation = "animate";
+    document.getElementById('runBtn').value = "Stop";
+    anim();
+  }
+}
+function reset() {
+  if( animation == "stop" ){
+    animation = "reset";
+    document.getElementById('runBtn').value = "Stop";
+    anim();}
+  else animation = "reset";
+}
+function setDelay(val) {
+  delay = parseInt(val);
+}
+function fr(){
+  var ti = new Date().getTime();
+  var fps = Math.round(1000*frames/(ti - time));
+  document.getElementById("framerate").value = fps;
+  frames = 0;  time = ti;
+}
+function setGa(v){
+  var g = v.valueOf();
+  kPath.setKernelArg(4, g, types.FLOAT);
+}
+function setIt(val) {
+  it = parseInt(val);
+}
+function setPlane(s) {
+  switch (s){
+    case "xy": kPix = kPixXY;   break;
+    case "xt": kPix = kPixXT;   break;
+    case "yt": kPix = kPixYT;   break;
+  }
+  drawPix();
+}
+</script>
+<style type="text/css">
+  H1{ font-size: 120%; color: green}
+  H2{ font-size: 100%; color: green}
+  pre{ color: darkblue}
+</style>
+</head><body onload="CL_start()">
+
+<p id="output"></p>
+<canvas id="c" width="512" height="512"></canvas>
+<br><button onclick="reset()">Reset</button>
+<input type="button" onclick="run()" value="Stop" size="1" id="runBtn">
+&gamma;<input size="3" value="0.01" onchange="setGa( this.value )">
+It<input size="1" value="10" onchange="setIt( this.value )">
+delay<input size="2" value="0" onchange="setDelay( this.value )">
+fps<input size="2" id="framerate">
+plane:
+<input type="radio" name="p" onchange="setPlane( this.value )" value="xy" checked >xy
+<input type="radio" name="p" onchange="setPlane( this.value )" value="xt">xt
+<input type="radio" name="p" onchange="setPlane( this.value )" value="yt">yt
+
+</body></html>
