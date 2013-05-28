@@ -11,8 +11,16 @@ requestAnimationFrame = (function() {
 
 function init_gl( canvas ) {
    gl = canvas.getContext("experimental-webgl");
-   var prog  = gl.createProgram();
-   var str =
+   if (!gl) {
+      alert("Unfortunately your system does not support WebGL");
+      return;
+   }
+
+   init_shaders();
+   init_buffers();
+}
+
+var vertexShaderSrc =
 "  attribute vec2 aPos;"+
 "  attribute vec2 aTexCoord;"+
 "  varying   vec2 vTC;"+
@@ -20,15 +28,8 @@ function init_gl( canvas ) {
 "   gl_Position = vec4(aPos, 0., 1.);"+
 "   vTC = aTexCoord;"+
 "}";
-   var shader = gl.createShader(gl.VERTEX_SHADER);
-   gl.shaderSource(shader, str);
-   gl.compileShader(shader);
-   if (gl.getShaderParameter(shader, gl.COMPILE_STATUS) == 0)
-      alert(gl.getShaderInfoLog(shader));
-   gl.attachShader(prog, shader);
 
-   shader = gl.createShader ( gl.FRAGMENT_SHADER );
-   str =
+var fragmentShaderSrc =
 "#ifdef GL_ES \n"+
 "precision highp float; \n"+
 "#endif \n"+
@@ -37,14 +38,28 @@ function init_gl( canvas ) {
 "void main(void) {"+
 "   gl_FragColor = texture2D(samp, vTC);"+
 "}";
-   gl.shaderSource(shader, str);
+var prog;
+function init_shaders() {
+   prog = gl.createProgram();
+   var shader = gl.createShader(gl.VERTEX_SHADER);
+   gl.shaderSource(shader, vertexShaderSrc);
+   gl.compileShader(shader);
+   if (gl.getShaderParameter(shader, gl.COMPILE_STATUS) == 0)
+      alert(gl.getShaderInfoLog(shader));
+   gl.attachShader(prog, shader);
+
+   shader = gl.createShader ( gl.FRAGMENT_SHADER );
+   gl.shaderSource(shader, fragmentShaderSrc);
    gl.compileShader(shader);
    if (gl.getShaderParameter(shader, gl.COMPILE_STATUS) == 0)
       alert(gl.getShaderInfoLog(shader));
    gl.attachShader(prog, shader);
    gl.linkProgram(prog);
    gl.useProgram(prog);
-    var aPosLoc = gl.getAttribLocation(prog, "aPos");
+}
+
+function init_buffers() {
+   var aPosLoc = gl.getAttribLocation(prog, "aPos");
    var aTexLoc = gl.getAttribLocation(prog, "aTexCoord");
    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(
@@ -53,7 +68,7 @@ function init_gl( canvas ) {
    gl.vertexAttribPointer(aTexLoc, 2, gl.FLOAT, false, 16, 8);
    gl.enableVertexAttribArray( aPosLoc );
    gl.enableVertexAttribArray( aTexLoc );
-    var texture = gl.createTexture();
+   var texture = gl.createTexture();
    gl.bindTexture(gl.TEXTURE_2D, texture);
    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
@@ -66,5 +81,4 @@ function draw_gl(nx, ny, pixels) {
    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, nx, ny, 0,
      gl.RGBA, gl.UNSIGNED_BYTE, pixels);
    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
-   gl.flush();
 }
