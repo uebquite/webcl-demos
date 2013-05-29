@@ -113,6 +113,8 @@ function getShader ( gl, id ){
 }
 
 var colLoc;
+var line_prog;
+var line_buf;
 function initGL() {
    var canvas = document.getElementById("c");
    if (!window.WebGLRenderingContext){
@@ -121,14 +123,19 @@ function initGL() {
    try { gl = canvas.getContext("experimental-webgl");
    } catch(e) {}
    if ( !gl ) {alert("Can't get WebGL"); return;}
-   var line_prog  = gl.createProgram();
+   line_prog = gl.createProgram();
    gl.attachShader(line_prog, getShader( gl, "line-vs" ));
    gl.attachShader(line_prog, getShader( gl, "line-fs" ));
    gl.linkProgram(line_prog);
    var lineLoc = gl.getAttribLocation(line_prog, "aPos");
    colLoc  = gl.getUniformLocation(line_prog, "color");
-   var line_buf = gl.createBuffer();
+   line_buf = gl.createBuffer();
    gl.bindBuffer(gl.ARRAY_BUFFER, line_buf);
+
+   if(interop) {
+     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(bufferSize), gl.STATIC_DRAW);
+   }
+
    gl.vertexAttribPointer(lineLoc, 2, gl.FLOAT, false, 0, 0);
    gl.useProgram(line_prog);
    gl.clearColor(1,1,1, 1);
@@ -153,7 +160,8 @@ function loadKernel ( id ){
 
 var gl;
 var ctx_c, n = 1024, it = 10, ev, bufferSize = 4*4*n,
-    frames = 0, animation = "animate", time, delay = 0;
+    frames = 0, animation = "animate", time, delay = 0,
+    interop = false;
 var kPath, kPix, kPixXY, kPixXT, kPixYT, cmdQueue, iPath, iPath1,
     bufPix, outBuffer;
 var types = WebCLKernelArgumentTypes;
@@ -161,6 +169,10 @@ var types = WebCLKernelArgumentTypes;
 function CL_start() {
 
   window.WebCL = webcl;
+
+  if(interop) {
+    initGL();
+  }
 
   try {
     if (window.WebCL == undefined) {
@@ -171,7 +183,7 @@ function CL_start() {
     var platforms = WebCL.getPlatforms();
     if(platforms.length === 0) {
         alert("No platforms available");
-        return;
+        return false;
     }
 
     var platform = platforms[0];
@@ -179,14 +191,32 @@ function CL_start() {
     var platDevices = platform.getDevices(WebCL.DEVICE_TYPE_GPU);
     if(platDevices.length === 0) {
         alert("No devices available");
-        return;
+        return false;
     }
 
     var device = platDevices[0];
-    var contextProperties = {platform: platform, devices: device,
-                             deviceType: WebCL.DEVICE_TYPE_ALL, shareGroup: 0, hint: null};
 
-    var context = WebCL.createContext(contextProperties);
+    var extension = null;
+    var context = null;
+    if (interop) {
+      extension = WebCL.getExtension("KHR_GL_SHARING");
+      if (!extension) {
+          alert("Not using GL interoperability");
+          interop = false;
+      }
+      var contextProperties = {platform: platform, devices: device,
+                             deviceType: WebCL.DEVICE_TYPE_ALL, shareGroup: 1, hint: null};
+      context = extension.createContext(contextProperties);
+    } else {
+      var contextProperties = {platform: platform, devices: device,
+                             deviceType: WebCL.DEVICE_TYPE_ALL, shareGroup: 0, hint: null};
+      context = WebCL.createContext(contextProperties);
+    }
+
+    if (!context) {
+      alert("Cannot create the context");
+      return false;
+    }
     var UIrand = new Uint32Array(4*n);
     for ( var i = 0; i < 4*n;  i++ )
       UIrand[i] = Math.floor(Math.random() * 4294967295);
@@ -198,6 +228,7 @@ function CL_start() {
         path[j + 8*i] = x0;  path[j + 1 + 8*i] = y0;}
     }
     var bufRand = context.createBuffer (WebCL.MEM_READ_WRITE, bufferSize);
+    cmdQueue = context.createCommandQueue (device, 0);
 
     // FIXME: According to WebCL spec from May-14,2013 the WebCLImageDescriptor
     // dictionary has channelType as second parameter instead of channelDataType,
@@ -207,7 +238,11 @@ function CL_start() {
                       width:4, height:n, rowPitch:0};
     iPath  = context.createImage(WebCL.MEM_READ_WRITE, descriptor);
     iPath1 = context.createImage(WebCL.MEM_READ_WRITE, descriptor);
-    bufPix = context.createBuffer (WebCL.MEM_WRITE_ONLY, bufferSize*2);
+    if (interop) {
+      bufPix = context.createFromGLBuffer(WebCL.MEM_WRITE_ONLY, line_buf);
+    } else {
+      bufPix = context.createBuffer (WebCL.MEM_WRITE_ONLY, bufferSize*2);
+    }
 
     var kernelSrc = loadKernel("clProg");
     var program = context.createProgram(kernelSrc);
@@ -236,7 +271,6 @@ function CL_start() {
     kPixYT.setArg(1, iPath1);
     kPixYT.setArg(2, bufPix);
     kPix = kPixXY;
-    cmdQueue = context.createCommandQueue (device, 0);
 
     var origin = new Int32Array([0,0,0]);
     var region = new Int32Array([4,n,1]);
@@ -250,8 +284,12 @@ function CL_start() {
       += "<h3>ERROR:</h3><pre style=\"color:red;\">" + e.message + "</pre>";
     throw e;
   }
-  initGL();
-  outBuffer = new Float32Array(4*2*n);
+  if(!interop){
+    initGL();
+    outBuffer = new Float32Array(bufferSize/2);
+  } else {
+    outBuffer = new Float32Array(bufferSize);
+  }
   time = new Date().getTime();
   setInterval(fr, 500);
   anim();
@@ -279,21 +317,39 @@ function draw(){
 function drawPix(){
   var globalWorkSize = new Int32Array([4,n]);
   var localWorkSize  = new Int32Array([1,8]);
+  try {
+    if(interop) {
+       gl.finish();
+       cmdQueue.enqueueAcquireGLObjects(bufPix);
+    }
 
-  cmdQueue.enqueueNDRangeKernel(kPix, [], globalWorkSize, localWorkSize);
-  cmdQueue.enqueueReadBuffer(bufPix, true, 0, bufferSize*2, outBuffer);
-  gl.clear(gl.COLOR_BUFFER_BIT);
-  gl.bufferData(gl.ARRAY_BUFFER, outBuffer, gl.STATIC_DRAW);
+    cmdQueue.enqueueNDRangeKernel(kPix, [], globalWorkSize, localWorkSize);
 
-  gl.uniform4f(colLoc, 0,0,0,1);
-  gl.drawArrays(gl.LINE_STRIP, 0, n);
-  gl.uniform4f(colLoc, 1,0,0,1);
-  gl.drawArrays(gl.LINE_STRIP, n, n);
-  gl.uniform4f(colLoc, 0,1,0,1);
-  gl.drawArrays(gl.LINE_STRIP, 2*n, n);
-  gl.uniform4f(colLoc, 0,0,1,1);
-  gl.drawArrays(gl.LINE_STRIP, 3*n, n);
-  gl.flush();
+    if (!interop) {
+      cmdQueue.enqueueReadBuffer(bufPix, true, 0, bufferSize*2, outBuffer);
+    } else {
+      cmdQueue.enqueueReleaseGLObjects(bufPix);
+      cmdQueue.finish();
+    }
+
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    if(!interop){
+      gl.bufferData(gl.ARRAY_BUFFER, outBuffer, gl.STATIC_DRAW);
+    }
+
+    gl.uniform4f(colLoc, 0,0,0,1);
+    gl.drawArrays(gl.LINE_STRIP, 0, n);
+    gl.uniform4f(colLoc, 1,0,0,1);
+    gl.drawArrays(gl.LINE_STRIP, n, n);
+    gl.uniform4f(colLoc, 0,1,0,1);
+    gl.drawArrays(gl.LINE_STRIP, 2*n, n);
+    gl.uniform4f(colLoc, 0,0,1,1);
+    gl.drawArrays(gl.LINE_STRIP, 3*n, n);
+    gl.flush();
+  } catch(e) {
+      alert("Drawpix error = " + e.message);
+  }
 }
 function anim(){
    draw();
@@ -343,7 +399,8 @@ function setDelay(val) {
 function fr(){
   var ti = new Date().getTime();
   var fps = Math.round(1000*frames/(ti - time));
-  document.getElementById("framerate").value = fps;
+  // FIXME: Sometimes we have a division per 0, avoiding it...
+  document.getElementById("framerate").value = isNaN(fps) ? 0 : fps;
   frames = 0;  time = ti;
 }
 function setGa(v){
@@ -361,6 +418,20 @@ function setPlane(s) {
   }
   drawPix();
 }
+
+function runInterop()
+{
+  if (interop == false) {
+    interop = true;
+    document.getElementById('interopBtn').value = "Disable CL/GL Interoperability";
+    CL_start();
+  } else {
+    document.getElementById('interopBtn').value = "Enable CL/GL Interoperability";
+    interop = false;
+    CL_start();
+  }
+}
+
 </script>
 <style type="text/css">
   H1{ font-size: 120%; color: green}
@@ -372,11 +443,12 @@ function setPlane(s) {
 <p id="output"></p>
 <canvas id="c" width="512" height="512"></canvas>
 <br><button onclick="reset()">Reset</button>
+<input type="button" onclick="runInterop()" value="Enable CL/GL Interoperability" size="1" id="interopBtn">
 <input type="button" onclick="run()" value="Stop" size="1" id="runBtn">
 &gamma;<input size="3" value="0.01" onchange="setGa( this.value )">
-It<input size="1" value="10" onchange="setIt( this.value )">
-delay<input size="2" value="0" onchange="setDelay( this.value )">
-fps<input size="2" id="framerate">
+It<input size="3" value="10" onchange="setIt( this.value )">
+delay<input size="3" value="0" onchange="setDelay( this.value )">
+fps<input size="5" id="framerate">
 plane:
 <input type="radio" name="p" onchange="setPlane( this.value )" value="xy" checked >xy
 <input type="radio" name="p" onchange="setPlane( this.value )" value="xt">xt
