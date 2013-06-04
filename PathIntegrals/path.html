@@ -221,16 +221,6 @@ function CL_start() {
       alert("Cannot create the context");
       return false;
     }
-    var UIrand = new Uint32Array(4*n);
-    for ( var i = 0; i < 4*n;  i++ )
-      UIrand[i] = Math.floor(Math.random() * 4294967295);
-    var path = new Float32Array(4*2*n);
-    var x0, y0;
-    for ( var j = 0; j < 8;  j += 2 ){
-      x0 = Math.random();   y0 = Math.random();
-      for ( var i = 0; i < n;  i++ ){
-        path[j + 8*i] = x0;  path[j + 1 + 8*i] = y0;}
-    }
     bufRand = context.createBuffer (WebCL.MEM_READ_WRITE, bufferSize);
     cmdQueue = context.createCommandQueue (device, 0);
 
@@ -276,13 +266,10 @@ function CL_start() {
     kPixYT.setArg(2, bufPix);
     kPix = kPixXY;
 
-    var origin = new Int32Array([0,0,0]);
-    var region = new Int32Array([4,n,1]);
-    var hostRowPitch = new Uint32Array([0]);
+    initPaths(cmdQueue, iPath, iPath1);
 
-    cmdQueue.enqueueWriteImage(iPath, true, origin, region, hostRowPitch, path);
-    cmdQueue.enqueueWriteImage(iPath1, true, origin, region, hostRowPitch, path);
-    ev = cmdQueue.enqueueWriteBuffer(bufRand, true, 0, bufferSize, UIrand);
+    var UIRandom = createUIRandom();
+    ev = cmdQueue.enqueueWriteBuffer(bufRand, true, 0, bufferSize, UIRandom);
   } catch(e) {
     document.getElementById("output").innerHTML
       += "<h3>ERROR:</h3><pre style=\"color:red;\">" + e.message + "</pre>";
@@ -298,36 +285,57 @@ function CL_start() {
   setInterval(fr, 500);
   anim();
 }
+function createUIRandom(){
+  var size = Uint32Array.BYTES_PER_ELEMENT * n;
+  var UIrand = new Uint32Array(size);
+  for(var i = 0; i < size;  i++) {
+    UIrand[i] = Math.floor(Math.random() * 4294967295);
+  }
+  return UIrand;
+}
+function initPaths(queue, pathA, pathB){
+  var path = new Float32Array(4*2*n);
+  var x0, y0, j, i;
+  for(j = 0; j < 8;  j += 2 ){
+    x0 = Math.random();   y0 = Math.random();
+    for(i = 0; i < n;  i++ ){
+      path[j + 8*i] = x0;  path[j + 1 + 8*i] = y0;
+    }
+  }
+  var origin = new Int32Array([0,0,0]);
+  var region = new Int32Array([4,n,1]);
+  var hostRowPitch = new Uint32Array([0]);
+
+  queue.enqueueWriteImage(pathA, true, origin, region, hostRowPitch, path);
+  queue.enqueueWriteImage(pathB, true, origin, region, hostRowPitch, path);
+}
+var globalWorkSize = new Int32Array([4,n]);
 function draw(){
   for ( var i = 0; i < it;  i++ ){
    kPath.setArg(0, iPath);
    kPath.setArg(2, iPath1);
    kPath.setArg(3, 0, types.INT);
 
-   var globalWorkSize = new Int32Array([4,n]);
-   var localWorkSize = new Int32Array([4,8]);
 
-   ev = cmdQueue.enqueueNDRangeKernel(kPath, [], globalWorkSize, localWorkSize);
+   ev = cmdQueue.enqueueNDRangeKernel(kPath, [], globalWorkSize, null);
    cmdQueue.flush();
    kPath.setArg(0, iPath1);
    kPath.setArg(2, iPath);
    kPath.setArg(3, 1, types.INT);
-   ev = cmdQueue.enqueueNDRangeKernel(kPath, [], globalWorkSize, localWorkSize);
+   ev = cmdQueue.enqueueNDRangeKernel(kPath, [], globalWorkSize, null);
    cmdQueue.flush();
   }
   drawPix();
   frames++;
 }
 function drawPix(){
-  var globalWorkSize = new Int32Array([4,n]);
-  var localWorkSize  = new Int32Array([1,8]);
   try {
     if(interop) {
        gl.finish();
        cmdQueue.enqueueAcquireGLObjects(bufPix);
     }
 
-    cmdQueue.enqueueNDRangeKernel(kPix, [], globalWorkSize, localWorkSize);
+    cmdQueue.enqueueNDRangeKernel(kPix, [], globalWorkSize, null);
 
     if (!interop) {
       cmdQueue.enqueueReadBuffer(bufPix, true, 0, bufferSize*2, outBuffer);
@@ -359,19 +367,8 @@ function anim(){
    draw();
    switch ( animation ){
      case "reset":
-      var path = new Float32Array(8*n);
-      var x0, y0;
-      for ( var j = 0; j < 8;  j += 2 ){
-        x0 = Math.random();   y0 = Math.random();
-        for ( var i = 0; i < n;  i++ ){
-          path[j + 8*i] = x0;  path[j + 1 + 8*i] = y0;}
-      }
-      var origin = new Int32Array([0,0,0]);
-      var region = new Int32Array([4,n,1]);
-      var hostRowPitch = new Uint32Array([0]);
-      cmdQueue.enqueueWriteImage(iPath, true, origin, region, hostRowPitch, path);
-      cmdQueue.enqueueWriteImage(iPath1, true, origin, region, hostRowPitch, path);
-      animation = "animate";
+       initPaths(cmdQueue, iPath, iPath1);
+       animation = "animate";
      case "animate":
        if (delay == 0) requestAnimFrame(anim);
        else setTimeout("requestAnimFrame(anim)", delay);
