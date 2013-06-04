@@ -167,7 +167,7 @@ var ctx_c, n = 1024, it = 10, ev, bufferSize = 4*4*n,
     frames = 0, animation = "animate", time, delay = 0,
     interop = false;
 var kPath, kPix, kPixXY, kPixXT, kPixYT, cmdQueue, iPath, iPath1,
-    bufPix, outBuffer;
+    bufPix, outBuffer, bufRand;
 var types = WebCLKernelArgumentTypes;
 
 function CL_start() {
@@ -231,7 +231,7 @@ function CL_start() {
       for ( var i = 0; i < n;  i++ ){
         path[j + 8*i] = x0;  path[j + 1 + 8*i] = y0;}
     }
-    var bufRand = context.createBuffer (WebCL.MEM_READ_WRITE, bufferSize);
+    bufRand = context.createBuffer (WebCL.MEM_READ_WRITE, bufferSize);
     cmdQueue = context.createCommandQueue (device, 0);
 
     // FIXME: According to WebCL spec from May-14,2013 the WebCLImageDescriptor
