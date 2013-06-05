@@ -337,16 +337,31 @@ function keyFunc(event) {
 }
 
 function freeBuffers() {
-    sphereBuffer.release();
-    cameraBuffer.release();
-    pixelBuffer.release();
-    colorBuffer.release();
-    seedBuffer.release();
+    try {
+        sphereBuffer.release();
+        cameraBuffer.release();
+        pixelBuffer.release();
+        colorBuffer.release();
+        seedBuffer.release();
+        clQueue.release();
+        clProgram.release();
+        clKernel.release();
+        cl.release();
+    } catch (e) {
+        console.log(e.message);
+        //XXX Work around to solve the glitch when we change the canvas resolution
+        //XXX Probably we are leaking on Javascript CL binding
+        sphereBuffer = 0;
+        cameraBuffer = 0;
+        pixelBuffer = 0;
+        colorBuffer = 0;
+        seedBuffer = 0;
 
-    clQueue.release();
-    clProgram.release();
-    clKernel.release();
-    cl.release();
+        clQueue = 0;
+        clProgram = 0;
+        clKernel = 0;
+        cl = 0;
+    }
 }
 
 function allocateBuffers() {
@@ -364,13 +379,9 @@ function allocateBuffers() {
     clQueue.enqueueWriteBuffer(cameraBuffer, true, 0, bufSize, camera.getBuffer());
 
     pixelCount = canvas.width * canvas.height;
+
     pBuffer = new ArrayBuffer(4 * pixelCount);
     pixelArray = new Int32Array(pBuffer);
-    pixel8View = new Uint8ClampedArray(pixelCount * 4);
-
-    for(var i = 0; i < pixelCount * 4; i++) {
-        pixel8View[i] = i % 255;
-    }
 
     var seeds = new Uint32Array(pixelCount * 2);
 
@@ -435,8 +446,8 @@ function setupWebCL() {
         cl = webcl.createContext(contextProperties);
         clQueue = cl.createCommandQueue(selectedDevice, null);
         allocateBuffers();
-    } catch(err) {
-        alert("Error initializing WebCL");
+    } catch(e) {
+        alert("Error initializing WebCL : " + e.message);
     }
 
     try {
@@ -457,12 +468,12 @@ function setupWebCL() {
 function executeKernel() {
     var globalThreads = canvas.width * canvas.height;
     var globalWorkSize = new Int32Array(1);
-    globalWorkSize[0] = globalThreads;
-
 
     if(globalThreads % wgSize !== 0) {
         globalThreads = (Math.floor(globalThreads / wgSize) + 1) * wgSize;
     }
+
+    globalWorkSize[0] = globalThreads;
 
     var localWorkSize = new Int32Array(1);
     localWorkSize[0] = wgSize;
