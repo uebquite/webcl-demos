@@ -65,22 +65,10 @@ requestAnimationFrame = window.requestAnimationFrame ||
 
 var start = window.mozAnimationStartTime;  // Only supported in FF. Other browsers can use something like Date.now(). 
 
-function webclsmallpt() {
-    htmlConsole = document.getElementById("console");
-    canvas = document.getElementById("canvas");
-    canvasContext = canvas.getContext("2d");
+function initPathTracing() {
+    initUI();
 
-    scene = new Scene();
-    spheres = scene.getBuffer();
-    camera = new Camera();
-
-    camera.orig.set([50.0, 45.0, 205.6]);
-    camera.target.set([50.0, 45.0 - 0.042612, 204.6]);
-
-    updateCamera();
-
-    setupWebCL();
-    canvasContent = canvasContext.createImageData(canvas.width, canvas.height);
+    initWebCL();
 
     updateRendering();
     running = true;
@@ -101,7 +89,23 @@ function step(timestamp) {
     }
 }
 
-function updateCamera() {
+function initUI() {
+    htmlConsole = document.getElementById("console");
+    canvas = document.getElementById("canvas");
+    canvasContext = canvas.getContext("2d");
+    canvasContent = canvasContext.createImageData(canvas.width, canvas.height);
+
+    scene = new Scene();
+    spheres = scene.getBuffer();
+    camera = new Camera();
+
+    camera.orig.set([50.0, 45.0, 205.6]);
+    camera.target.set([50.0, 45.0 - 0.042612, 204.6]);
+
+    setupCamera();
+}
+
+function setupCamera() {
     vec3.subtract(camera.target, camera.orig, camera.dir);
     vec3.normalize(camera.dir);
 
@@ -127,7 +131,7 @@ function reInitScene() {
 function reInit() {
     currentSample = 0;
 
-    updateCamera();
+    setupCamera();
 
     var bufSize = 15 * 4;
     clQueue.enqueueWriteBuffer(cameraBuffer, true, 0, bufSize, camera.getBuffer());
@@ -171,8 +175,8 @@ function resolutionChanged(resolution) {
         canvas.height = 600;
     }
 
-    freeBuffers();
-    webclsmallpt();
+    releaseBuffers();
+    initPathTracing();
     reInit();
 }
 
@@ -336,7 +340,7 @@ function keyFunc(event) {
     }
 }
 
-function freeBuffers() {
+function releaseBuffers() {
     try {
         sphereBuffer.release();
         cameraBuffer.release();
@@ -424,7 +428,7 @@ function clDeviceQuery() {
   return deviceList;
 };
 
-function setupWebCL() {
+function initWebCL() {
 
     var deviceList = clDeviceQuery();
 
