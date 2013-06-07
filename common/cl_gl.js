@@ -8,7 +8,7 @@ requestAnimationFrame = (function() {
   };
 
 })();
-
+var gl;
 function init_gl( canvas ) {
    gl = canvas.getContext("experimental-webgl");
    if (!gl) {
@@ -58,17 +58,20 @@ function init_shaders() {
    gl.useProgram(prog);
 }
 
+var buffer = null;
+var texture = null;
 function init_buffers() {
    var aPosLoc = gl.getAttribLocation(prog, "aPos");
    var aTexLoc = gl.getAttribLocation(prog, "aTexCoord");
-   gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+   buffer = gl.createBuffer();
+   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(
       [-1,-1,0,0, 1,-1,1,0, 1,1,1,1, -1,1,0,1]), gl.STATIC_DRAW);
    gl.vertexAttribPointer(aPosLoc, 2, gl.FLOAT, false, 16, 0);
    gl.vertexAttribPointer(aTexLoc, 2, gl.FLOAT, false, 16, 8);
    gl.enableVertexAttribArray( aPosLoc );
    gl.enableVertexAttribArray( aTexLoc );
-   var texture = gl.createTexture();
+   texture = gl.createTexture();
    gl.bindTexture(gl.TEXTURE_2D, texture);
    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
@@ -81,4 +84,16 @@ function draw_gl(nx, ny, pixels) {
    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, nx, ny, 0,
      gl.RGBA, gl.UNSIGNED_BYTE, pixels);
    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+}
+
+function getGLBuffer() {
+  return buffer;
+}
+
+function getGLTexture() {
+  return texture;
+}
+
+function endGL(){
+  gl.finish();
 }

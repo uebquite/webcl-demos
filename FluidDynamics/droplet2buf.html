@@ -86,10 +86,12 @@ requestAnimFrame = (function(){
 })();
 
 var n = 512, kAdvec, kForce, kP, kG, kDiv, kShow, cmdQueue,
-  U, U1, D, D1, P, P1, G,
-  bufPix, outPix, bufferSize = 4*n*n,
+  U, U1, D, D1, P, P1, G, program, device,kernelSrc,
+  bufPix, outPix, bufferSize = 4*n*n, platform,
   bu = 10, it = 20, delay = 0, frames = 0, time, animation;
 var types = WebCLKernelArgumentTypes;
+var interop = true;
+var context = null;
 window.WebCL = webcl;
 
 function CL_prog() {
@@ -106,7 +108,7 @@ function CL_prog() {
         return false;
     }
 
-    var platform = platforms[0];
+    platform = platforms[0];
 
     var platDevices = platform.getDevices(WebCL.DEVICE_TYPE_GPU);
     if(platDevices.length === 0) {
@@ -114,80 +116,155 @@ function CL_prog() {
         return false;
     }
 
-    var device = platDevices[0];
-    var contextProperties = {platform: platform, devices: device,
-                             deviceType: WebCL.DEVICE_TYPE_ALL, shareGroup: 0, hint: null};
+    device = platDevices[0];
 
-    var context = WebCL.createContext(contextProperties);
-
-    var kernelSrc = loadKernel("clProgram");
-    var program = context.createProgram(kernelSrc);
-    try {
-      program.build (device, "");
-    } catch(e) {
-      alert ("Failed to build WebCL program. Error " +
-        program.getProgramBuildInfo(device,WebCL.PROGRAM_BUILD_STATUS) +
-        + ":  "
-        + program.getProgramBuildInfo(device,WebCL.PROGRAM_BUILD_LOG));
-      throw e;
-    }
-    D  = context.createBuffer(WebCL.MEM_READ_WRITE, bufferSize);
-    D1 = context.createBuffer(WebCL.MEM_READ_WRITE, bufferSize);
-    P  = context.createBuffer(WebCL.MEM_READ_WRITE, bufferSize);
-    P1 = context.createBuffer(WebCL.MEM_READ_WRITE, bufferSize);
-    U  = context.createBuffer(WebCL.MEM_READ_WRITE, bufferSize*2);
-    U1 = context.createBuffer(WebCL.MEM_READ_WRITE, bufferSize*2);
-    G  = context.createBuffer(WebCL.MEM_READ_WRITE, bufferSize);
-
-    bufPix = context.createBuffer(WebCL.MEM_WRITE_ONLY, bufferSize);
-    kShow = program.createKernel("kShow");
-    kShow.setArg(0, D);
-    kShow.setArg(1, bufPix);
-    kAdvec = program.createKernel("kAdvec");
-    kForce = program.createKernel("kForce");
-    kForce.setArg(3, .001*.5*bu, types.FLOAT);
-    kG = program.createKernel("kG");
-    kG.setArg(1, G);
-    kP = program.createKernel("kP");
-    kP.setArg(1, G);
-    kDiv = program.createKernel("kDiv");
-
-    cmdQueue = context.createCommandQueue(device, 0);
-
-    var inkDensity = new Float32Array( n*n );
-    var t = 0, h = 1/n, d;
-    for(var i = 0; i < n; i++)
-      for(var j = 0; j < n; j++){
-       var x = h*(j-n/2),  y = h*(i-n/2) - .4;
-       if (x*x + y*y > .01) d = 0; else d = -2;
-       inkDensity[t++] = d;
-      }
-    cmdQueue.enqueueWriteBuffer(D, true, 0, bufferSize, inkDensity);
-
-    var velocity = new Float32Array( 2*n*n );
-    var t = 0;
-    for(var i = 0; i < n; i++)
-      for(var j = 0; j < n; j++){
-        velocity[t++] = 0;  velocity[t++] = 0;
-      }
-    cmdQueue.enqueueWriteBuffer(U, true, 0, bufferSize*2, velocity);
-
-    var pressure = new Float32Array( n*n );
-    for(var i = 0; i < n*n; i++) pressure[i] = 0;
-    cmdQueue.enqueueWriteBuffer(P, true, 0, bufferSize, pressure);
+    runCL();
   } catch(e) {
     document.getElementById("output").innerHTML
       += "<h3>ERROR:</h3><pre style=\"color:red;\">" + e.message + "</pre>";
     throw e;
   }
-  var canvas = document.getElementById("c");
-  init_gl(canvas);
-  outPix = new Uint8Array(4*n*n);
+}
 
-  setInterval(fr, 500);
-  time = new Date().getTime();
-  animation = "animate";
-  anim();
+function runCL()
+{
+  try {
+    var canvas = document.getElementById("c");
+
+    if(interop){
+      init_gl(canvas);
+    }
+
+    context = createProperContext();
+    buildProgram();
+    initBuffers();
+    prepareKernel();
+    prepareCommandQueue();
+
+    if(!interop){
+      init_gl(canvas);
+    }
+
+    outPix = new Uint8Array(bufferSize);
+
+    setInterval(fr, 500);
+    time = new Date().getTime();
+    animation = "animate";
+    anim();
+  } catch(e) {
+    alert("Error  = " + e.message);
+  }
+}
+
+function createProperContext(device)
+{
+  if (interop) {
+    var extension = null;
+    extension = WebCL.getExtension("KHR_GL_SHARING");
+    if (!extension) {
+        alert("Not using GL interoperability");
+        interop = false;
+    }
+    var contextProperties = {platform: platform, devices: device,
+                           deviceType: WebCL.DEVICE_TYPE_ALL, shareGroup: 1, hint: null};
+    context = extension.createContext(contextProperties);
+  } else {
+    var contextProperties = {platform: platform, devices: device,
+                           deviceType: WebCL.DEVICE_TYPE_ALL, shareGroup: 0, hint: null};
+    context = WebCL.createContext(contextProperties);
+  }
+
+  if (!context) {
+    alert("Cannot create the context");
+    return false;
+  }
+
+  return context;
+}
+
+function buildProgram()
+{
+  kernelSrc = loadKernel("clProgram");
+  program = context.createProgram(kernelSrc);
+  try {
+    program.build (device, "");
+  } catch(e) {
+    alert ("Failed to build WebCL program. Error " +
+      program.getProgramBuildInfo(device,WebCL.PROGRAM_BUILD_STATUS) +
+      + ":  "
+      + program.getProgramBuildInfo(device,WebCL.PROGRAM_BUILD_LOG));
+    throw e;
+  }
+}
+
+function initBuffers()
+{
+  D  = context.createBuffer(WebCL.MEM_READ_WRITE, bufferSize);
+  D1 = context.createBuffer(WebCL.MEM_READ_WRITE, bufferSize);
+  P  = context.createBuffer(WebCL.MEM_READ_WRITE, bufferSize);
+  P1 = context.createBuffer(WebCL.MEM_READ_WRITE, bufferSize);
+  U  = context.createBuffer(WebCL.MEM_READ_WRITE, bufferSize*2);
+  U1 = context.createBuffer(WebCL.MEM_READ_WRITE, bufferSize*2);
+  G  = context.createBuffer(WebCL.MEM_READ_WRITE, bufferSize);
+}
+
+function prepareKernel()
+{
+  try{
+    if (interop) {
+      var texture = getGLTexture();
+      alert("texture =" + texture);
+      bufPix = context.createFromGLTexture2D(WebCL.MEM_WRITE_ONLY, WebCL.GL_TEXTURE_2D, WebCL.CL_RGBA, texture);
+      alert("ok");
+    } else {
+      bufPix = context.createBuffer (WebCL.MEM_WRITE_ONLY, bufferSize);
+    }
+  } catch (e){
+    alert("Error on prepareKernel = " + e.message);
+  }
+
+  kShow = program.createKernel("kShow");
+  kShow.setArg(0, D);
+  kShow.setArg(1, bufPix);
+  kAdvec = program.createKernel("kAdvec");
+  kForce = program.createKernel("kForce");
+  kForce.setArg(3, .001*.5*bu, types.FLOAT);
+  kG = program.createKernel("kG");
+  kG.setArg(1, G);
+  kP = program.createKernel("kP");
+  kP.setArg(1, G);
+  kDiv = program.createKernel("kDiv");
+}
+
+function prepareCommandQueue()
+{
+  //alert("1");
+  cmdQueue = context.createCommandQueue(device, 0);
+  var inkDensity = new Float32Array( n*n );
+  var t = 0, h = 1/n, d;
+  for(var i = 0; i < n; i++)
+    for(var j = 0; j < n; j++){
+     var x = h*(j-n/2),  y = h*(i-n/2) - .4;
+     if (x*x + y*y > .01) d = 0; else d = -2;
+     inkDensity[t++] = d;
+    }
+  //alert("2");
+  cmdQueue.enqueueWriteBuffer(D, true, 0, bufferSize, inkDensity);
+
+  var velocity = new Float32Array( 2*n*n );
+  var t = 0;
+  for(var i = 0; i < n; i++)
+    for(var j = 0; j < n; j++){
+      velocity[t++] = 0;  velocity[t++] = 0;
+    }
+  //alert("3");
+  cmdQueue.enqueueWriteBuffer(U, true, 0, bufferSize*2, velocity);
+
+  var pressure = new Float32Array( n*n );
+  for(var i = 0; i < n*n; i++) pressure[i] = 0;
+  //alert("4");
+  cmdQueue.enqueueWriteBuffer(P, true, 0, bufferSize, pressure);
+  //alert("5");
 }
 
 function draw(){
@@ -213,7 +290,6 @@ function draw(){
   kG.setArg(0, U);
   ev = cmdQueue.enqueueNDRangeKernel(kG, [], globalWorkSize, localWorkSize);
   cmdQueue.flush();
-
   for(var j = 0; j < it; j++){
     kP.setArg(0, P);
     kP.setArg(2, P1);
@@ -229,11 +305,31 @@ function draw(){
   cmdQueue.flush();
   tmp = U;  U = U1;  U1 = tmp;
 
+  if (interop){
+    endGL();
+    cmdQueue.enqueueAcquireGLObjects(bufPix);
+  }
+
   kShow.setArg(0, D);
+  //alert("11 cmdQueue = " + cmdQueue);
   cmdQueue.enqueueNDRangeKernel(kShow, [], globalWorkSize, localWorkSize);
-  cmdQueue.finish();
-  cmdQueue.enqueueReadBuffer(bufPix, true, 0, bufferSize, outPix);
-  draw_gl(n, n, outPix);
+  cmdQueue.enqueueReadBuffer(bufPix, true, 0, bufferSize/2, outPix);
+  //cmdQueue.finish();
+  //alert("13");
+
+  try{
+    if (!interop) {
+      //cmdQueue.enqueueReadBuffer(bufPix, true, 0, bufferSize, outPix);
+    } else {
+      //alert("13");
+      cmdQueue.enqueueReleaseGLObjects(bufPix);
+      //alert("15");
+    }
+    cmdQueue.finish();
+    draw_gl(n, n, outPix);
+  } catch (e) {
+    alert("error no draw = " + e.message);
+  }
   frames++;
 }
 function anim(){
@@ -302,6 +398,21 @@ function setBu(v) {
   bu = v.valueOf();             //    c = dt*b/2
   kForce.setArg(3, .001*.5*bu, types.FLOAT);
 }
+function toggleInterop()
+{
+    if (interop == false) {
+    //cmdQueue.finish();
+    interop = true;
+    document.getElementById('interopBtn').value = "Disable CL/GL Interoperability";
+    runCL();
+  } else {
+    //cmdQueue.finish();
+    document.getElementById('interopBtn').value = "Enable CL/GL Interoperability";
+    interop = false;
+    runCL();
+  }
+}
+
 </script>
 <style type="text/css">
   H1{ font-size: 120%; color: green}
@@ -315,10 +426,11 @@ function setBu(v) {
 
 <canvas id="c" width="512" height="512" ></canvas>
 <br><button onclick="reset()">Reset</button>
+<input type="button" onclick="toggleInterop()" value="Enable CL/GL Interoperability" size="1" id="interopBtn">
 <input type="button" onclick="run()" value="Stop" size="1" id="runBtn">
 &beta;<input size="2" value="10" onchange="setBu( this.value )">
-It<input size="1" value="20" onchange="setIt( this.value )">
+It<input size="2" value="20" onchange="setIt( this.value )">
 delay<input size="1" value="0" onchange="setDelay( this.value )">
-fps<input size="1" id="framerate">
+fps<input size="3" id="framerate">
 
 </body></html>
