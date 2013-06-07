@@ -8,8 +8,8 @@ requestAnimationFrame = (function() {
   };
 
 })();
-
-function init_gl( canvas ) {
+var flush = false;
+function init_gl( canvas, linear ) {
    gl = canvas.getContext("experimental-webgl");
    if (!gl) {
       alert("Unfortunately your system does not support WebGL");
@@ -17,7 +17,8 @@ function init_gl( canvas ) {
    }
 
    init_shaders();
-   init_buffers();
+   init_buffers( linear );
+   flush = linear;
 }
 
 var vertexShaderSrc =
@@ -58,7 +59,7 @@ function init_shaders() {
    gl.useProgram(prog);
 }
 
-function init_buffers() {
+function init_buffers( linear ) {
    var aPosLoc = gl.getAttribLocation(prog, "aPos");
    var aTexLoc = gl.getAttribLocation(prog, "aTexCoord");
    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
@@ -71,8 +72,13 @@ function init_buffers() {
    var texture = gl.createTexture();
    gl.bindTexture(gl.TEXTURE_2D, texture);
    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+   if(linear) {
+     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+   } else {
+     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+   }
    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 }
@@ -81,4 +87,8 @@ function draw_gl(nx, ny, pixels) {
    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, nx, ny, 0,
      gl.RGBA, gl.UNSIGNED_BYTE, pixels);
    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+   if(flush){
+     gl.flush();
+   }
+
 }
