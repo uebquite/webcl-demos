@@ -1,0 +1,8 @@
+DEMO              | Compare against pure JS  |   Uses WebGL  |    Uses WebCLGL interop  |
+
+Barkley           |            No            |      Yes      |           No             |
+Fluid Dynamics    |            No            |      Yes      |           No             |
+Mandelbrot Expl.  |            No            |      Yes      |           No             |
+Path Integrals    |            No            |      Yes      |           Yes            |
+Small Path Tracing|            No            |      Yes      |           No             |
+Smoke Vision      |            No            |      Yes      |           No             |
