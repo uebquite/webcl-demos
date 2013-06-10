@@ -144,8 +144,8 @@ function draw(){
   kBarkley.setArg(0, b0);
   kBarkley.setArg(1, b1);
   cmdQueue.enqueueNDRangeKernel(kBarkley, 0, globalWorkSize, null);
+  cmdQueue.enqueueCopyBuffer(b1, b0, 0, 0, 4*bufSize);
   cmdQueue.finish();
-  var tmp = b0;  b0 = b1;  b1 = tmp;
 
   kShow.setArg(0, b0);
   cmdQueue.enqueueNDRangeKernel(kShow, 0, globalWorkSize, null);
