@@ -166,8 +166,9 @@ var gl;
 var ctx_c, n = 1024, it = 10, ev, bufferSize = 4*4*n,
     frames = 0, animation = "animate", time, delay = 0,
     interop = false;
+var program, device,kernelSrc, platform;
 var kPath, kPix, kPixXY, kPixXT, kPixYT, cmdQueue, iPath, iPath1,
-    bufPix, outBuffer, bufRand;
+    bufPix, outBuffer, bufRand, context = null;
 var types = WebCLKernelArgumentTypes;
 
 function CL_start() {
@@ -190,7 +191,7 @@ function CL_start() {
         return false;
     }
 
-    var platform = platforms[0];
+    platform = platforms[0];
 
     var platDevices = platform.getDevices(WebCL.DEVICE_TYPE_GPU);
     if(platDevices.length === 0) {
@@ -198,11 +199,50 @@ function CL_start() {
         return false;
     }
 
-    var device = platDevices[0];
+    device = platDevices[0];
 
-    var extension = null;
-    var context = null;
+    runCL();
+
+    } catch(e) {
+    document.getElementById("output").innerHTML
+      += "<h3>ERROR:</h3><pre style=\"color:red;\">" + e.message + "</pre>";
+  }
+
+}
+
+function runCL(){
+
+  try{
+    if(interop){
+      initGL();
+      outBuffer = new Float32Array(bufferSize);
+    }
+
+    context = createProperContext();
+    buildProgram();
+    bufRand = context.createBuffer (WebCL.MEM_READ_WRITE, bufferSize);
+    prepareKernel();
+    prepareCommandQueue();
+
+    if(!interop){
+      initGL();
+      outBuffer = new Float32Array(bufferSize/2);
+    }
+
+    time = new Date().getTime();
+    setInterval(fr, 500);
+    anim();
+    } catch (e){
+      throw e;
+    }
+
+}
+
+function createProperContext(device)
+{
+  try {
     if (interop) {
+      var extension = null;
       extension = WebCL.getExtension("KHR_GL_SHARING");
       if (!extension) {
           alert("Not using GL interoperability");
@@ -216,14 +256,31 @@ function CL_start() {
                              deviceType: WebCL.DEVICE_TYPE_ALL, shareGroup: 0, hint: null};
       context = WebCL.createContext(contextProperties);
     }
+  } catch (e){
+    throw e;
+  }
 
-    if (!context) {
-      alert("Cannot create the context");
-      return false;
-    }
-    bufRand = context.createBuffer (WebCL.MEM_READ_WRITE, bufferSize);
-    cmdQueue = context.createCommandQueue (device, 0);
+  return context;
+}
 
+function buildProgram()
+{
+  kernelSrc = loadKernel("clProg");
+  program = context.createProgram(kernelSrc);
+  try {
+    program.build (device, "");
+  } catch(e) {
+    alert ("Failed to build WebCL program. Error " +
+      program.getProgramBuildInfo(device,WebCL.PROGRAM_BUILD_STATUS) +
+      + ":  "
+      + program.getProgramBuildInfo(device,WebCL.PROGRAM_BUILD_LOG));
+    throw e;
+  }
+}
+
+function prepareKernel(){
+
+  try {
     // FIXME: According to WebCL spec from May-14,2013 the WebCLImageDescriptor
     // dictionary has channelType as second parameter instead of channelDataType,
     // but if we use it we got INVALID_IMAGE_FORMAT_DESCRIPTOR error.
@@ -236,17 +293,6 @@ function CL_start() {
       bufPix = context.createFromGLBuffer(WebCL.MEM_WRITE_ONLY, line_buf);
     } else {
       bufPix = context.createBuffer (WebCL.MEM_WRITE_ONLY, bufferSize*2);
-    }
-
-    var kernelSrc = loadKernel("clProg");
-    var program = context.createProgram(kernelSrc);
-    try {
-      program.build(device, "");
-    } catch(e) {
-      alert ("Failed to build WebCL program. Error "
-       + program.getBuildInfo (device, WebCL.PROGRAM_BUILD_STATUS)
-       + ":  " + program.getBuildInfo (device, WebCL.CL_PROGRAM_BUILD_LOG));
-      throw e;
     }
 
     kPath = program.createKernel("kPath");
@@ -265,26 +311,11 @@ function CL_start() {
     kPixYT.setArg(1, iPath1);
     kPixYT.setArg(2, bufPix);
     kPix = kPixXY;
-
-    initPaths(cmdQueue, iPath, iPath1);
-
-    var UIRandom = createUIRandom();
-    ev = cmdQueue.enqueueWriteBuffer(bufRand, true, 0, bufferSize, UIRandom);
-  } catch(e) {
-    document.getElementById("output").innerHTML
-      += "<h3>ERROR:</h3><pre style=\"color:red;\">" + e.message + "</pre>";
+  } catch (e) {
     throw e;
   }
-  if(!interop){
-    initGL();
-    outBuffer = new Float32Array(bufferSize/2);
-  } else {
-    outBuffer = new Float32Array(bufferSize);
-  }
-  time = new Date().getTime();
-  setInterval(fr, 500);
-  anim();
 }
+
 function createUIRandom(){
   var size = Uint32Array.BYTES_PER_ELEMENT * n;
   var UIrand = new Uint32Array(size);
@@ -293,6 +324,7 @@ function createUIRandom(){
   }
   return UIrand;
 }
+
 function initPaths(queue, pathA, pathB){
   var path = new Float32Array(4*2*n);
   var x0, y0, j, i;
@@ -306,9 +338,25 @@ function initPaths(queue, pathA, pathB){
   var region = new Int32Array([4,n,1]);
   var hostRowPitch = new Uint32Array([0]);
 
-  queue.enqueueWriteImage(pathA, true, origin, region, hostRowPitch, path);
-  queue.enqueueWriteImage(pathB, true, origin, region, hostRowPitch, path);
+  try {
+    queue.enqueueWriteImage(pathA, true, origin, region, hostRowPitch, path);
+    queue.enqueueWriteImage(pathB, true, origin, region, hostRowPitch, path);
+  } catch (e) {
+    throw e;
+  }
 }
+
+function prepareCommandQueue(){
+  try {
+    cmdQueue = context.createCommandQueue (device, 0);
+    initPaths(cmdQueue, iPath, iPath1);
+    var UIRandom = createUIRandom();
+    ev = cmdQueue.enqueueWriteBuffer(bufRand, true, 0, bufferSize, UIRandom);
+  } catch (e) {
+    throw e;
+  }
+}
+
 var globalWorkSize = new Int32Array([4,n]);
 function draw(){
   for ( var i = 0; i < it;  i++ ){
@@ -425,12 +473,11 @@ function runInterop()
   if (interop == false) {
     interop = true;
     document.getElementById('interopBtn').value = "Disable CL/GL Interoperability";
-    CL_start();
   } else {
     document.getElementById('interopBtn').value = "Enable CL/GL Interoperability";
     interop = false;
-    CL_start();
   }
+  runCL();
 }
 
 </script>
