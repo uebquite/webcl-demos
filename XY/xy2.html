@@ -1,7 +1,10 @@
 <html><head>
+
+<!-- based on XY Model http://www.ibiblio.org/e-notes/webcl/mc/xy2.html -->
+
 <TITLE>XY model. Modified chess-board algorithm</TITLE>
 
-<script src="cl_gl.js" type="text/javascript"></script>
+<script src="../common/gl.js" type="text/javascript"></script>
 
 <script id="clXY" type="text/x-opencl">
 
@@ -87,9 +90,9 @@ __kernel void kPix(read_only image2d_t sB, read_only image2d_t sW,
     iClamp( 512 - (int)abs(c - 1024) ),
     255);
 }
-</script>          
-            
-<script type="text/javascript"> 
+</script>
+
+<script type="text/javascript">
 
 function loadKernel ( id ){
    var shaderScript = document.getElementById ( id );
@@ -105,62 +108,88 @@ function loadKernel ( id ){
 var T = .02, n = 512, n2 = n/2,  it = 100, bufSize = 4*n*n, ev,
     ctx_c, frames = 0, animation = "animate", time, delay = 0;
 var kSpinB, kSpinW, kPix, cmdQueue, iSpinB, iSpinB1, iSpinW, iSpinW1,
-    bufPix, outBuffer;
+    bufPix, outBuffer, iTemp;
 
 function CL_rand () {
   try {
-    if (window.WebCL == undefined) {
+
+      if (window.webcl == undefined) {
       alert("Unfortunately your system does not support WebCL");
       return false;
     }
-    var platforms = WebCL.getPlatformIDs();
-    var ctx = WebCL.createContextFromType ([WebCL.CL_CONTEXT_PLATFORM, 
-       platforms[0]], WebCL.CL_DEVICE_TYPE_DEFAULT);
-    var devices = ctx.getContextInfo(WebCL.CL_CONTEXT_DEVICES);
 
-    var bufRand = ctx.createBuffer (WebCL.CL_MEM_READ_WRITE, 4*n*n2);
-    var format = {channelOrder:WebCL.CL_R, channelDataType:WebCL.CL_FLOAT};
-    iSpinB  = ctx.createImage2D(WebCL.CL_MEM_READ_WRIRE, format, n, n2, 0);
-    iSpinB1 = ctx.createImage2D(WebCL.CL_MEM_READ_WRITE, format, n, n2, 0);
-    iSpinW  = ctx.createImage2D(WebCL.CL_MEM_READ_WRIRE, format, n, n2, 0);
-    iSpinW1 = ctx.createImage2D(WebCL.CL_MEM_READ_WRITE, format, n, n2, 0);
-    bufPix  = ctx.createBuffer (WebCL.CL_MEM_WRITE_ONLY, 4*n*n);
+    var platforms = webcl.getPlatforms();
+
+    if (!platforms) {
+        alert("No platform found in your system")
+        return false;
+    }
+
+    var devices = platforms[0].getDevices(webcl.DEVICE_TYPE_GPU);
+
+    if (!devices) {
+        alert("No device found in your system")
+        return false;
+    }
+
+    var ctxProps = {platform: platforms[0], devices: [devices[0]],
+            deviceType: webcl.DEVICE_TYPE_GPU, shareGroup: 0, hint: null};
+
+    var ctx = webcl.createContext(ctxProps);
+
+    bufRand = ctx.createBuffer (webcl.MEM_READ_WRITE, 4*n*n2);
+    var format = {channelOrder:webcl.RGBA, channelDataType:webcl.FLOAT,
+            width: n, height: n2, rowPitch: 0};
+    iSpinB  = ctx.createImage(webcl.MEM_READ_WRITE, format);
+    iSpinB1 = ctx.createImage(webcl.MEM_READ_WRITE, format);
+    iSpinW  = ctx.createImage(webcl.MEM_READ_WRITE, format);
+    iSpinW1 = ctx.createImage(webcl.MEM_READ_WRITE, format);
+    iTemp   = ctx.createImage(webcl.MEM_READ_WRITE, format);
+    bufPix  = ctx.createBuffer (webcl.MEM_WRITE_ONLY, bufSize);
 
     var kernelSrc = loadKernel("clXY");
-    var program = ctx.createProgramWithSource(kernelSrc);
+    var program = ctx.createProgram(kernelSrc);
+
     try {
-      program.buildProgram ([devices[0]], "");
+      program.build([devices[0]]);
     } catch(e) {
       alert ("Failed to build WebCL program. Error "
-        + program.getProgramBuildInfo (devices[0],
-           WebCL.CL_PROGRAM_BUILD_STATUS)
-        + ":  " + program.getProgramBuildInfo (devices[0], 
-           WebCL.CL_PROGRAM_BUILD_LOG));
+        + program.getBuildInfo (devices[0],
+           webcl.PROGRAM_BUILD_STATUS)
+        + ":  " + program.getBuildInfo (devices[0],
+           webcl.PROGRAM_BUILD_LOG));
       throw e;
     }
+
     kSpinB = program.createKernel ("kSpinB");
-    kSpinB.setKernelArg(3, bufRand);
-    kSpinB.setKernelArg(4, 1/T, WebCL.types.FLOAT);
+    kSpinB.setArg(3, bufRand);
+    kSpinB.setArg(4, 1/T, WebCLKernelArgumentTypes.FLOAT);
+
     kSpinW = program.createKernel ("kSpinW");
-    kSpinW.setKernelArg(3, bufRand);
-    kSpinW.setKernelArg(4, 1/T, WebCL.types.FLOAT);
+    kSpinW.setArg(3, bufRand);
+    kSpinW.setArg(4, 1/T, WebCLKernelArgumentTypes.FLOAT);
+
     kPix = program.createKernel("kPix");
-    kPix.setKernelArg(2, bufPix);
-            
-    var UIrand = new Uint32Array(n*n2);    
-    for ( var i = 0; i < n*n2;  i++ )
+    kPix.setArg(2, bufPix);
+
+    var UIrand = new Uint32Array(4*n*n2);
+    for ( var i = 0; i < 4*n*n2;  i++ )
       UIrand[i] = Math.floor(Math.random() * 4294967295);
-    var spin = new Float32Array(n*n2);    
+    var spin = new Float32Array(n*n2);
     for ( var i = 0; i < n*n2;  i++ ) spin[i] = Math.random();
     cmdQueue = ctx.createCommandQueue (devices[0], 0);
-    cmdQueue.enqueueWriteImage(iSpinB, true, [0,0,0], [n,n2,1],0,0, spin, []);
+
+    cmdQueue.enqueueWriteImage(iSpinB, true, new Int32Array([0,0,0]), new Int32Array([n,n2,1]), 0, spin);
+
     for ( var i = 0; i < n*n2;  i++ ) spin[i] = Math.random();
-    cmdQueue.enqueueWriteImage(iSpinW, true, [0,0,0], [n,n2,1],0,0, spin, []);
-    ev = cmdQueue.enqueueWriteBuffer(bufRand, true, 0, 4*n*n2, UIrand, []);
-    outBuffer = new Uint8Array(4*n*n);
+    cmdQueue.enqueueWriteImage(iSpinW, true, new Int32Array([0,0,0]), new Int32Array([n,n2,1]), 0   , spin);
+
+    cmdQueue.enqueueWriteBuffer(bufRand, true, 0, 4*n*n2, UIrand);
+    outBuffer = new Uint8Array(bufSize);
   } catch(e) {
-    document.getElementById("output").innerHTML 
+    document.getElementById("output").innerHTML
       += "<h3>ERROR:</h3><pre style=\"color:red;\">" + e.message + "</pre>";
+    console.error(e);
     throw e;
   }
   var canvas = document.getElementById("c");
@@ -169,41 +198,78 @@ function CL_rand () {
   setInterval(fr, 500);
   anim();
 }
+
 function draw(){
   for ( var i = 0; i < it;  i++ ){
-   kSpinW.setKernelArg(0, iSpinB);
-   kSpinW.setKernelArg(1, iSpinW);
-   kSpinW.setKernelArg(2, iSpinW1);
-   ev = cmdQueue.enqueueNDRangeKernel(kSpinW, 2, [], [n,n2], [8,8], [ev]);
-   cmdQueue.flush();
-   var tmp = iSpinW1;  iSpinW1 = iSpinW;  iSpinW = tmp;
+    kSpinW.setArg(0, iSpinB);
+    kSpinW.setArg(1, iSpinW);
+    kSpinW.setArg(2, iSpinW1);
 
-   kSpinB.setKernelArg(0, iSpinB);
-   kSpinB.setKernelArg(1, iSpinW);
-   kSpinB.setKernelArg(2, iSpinB1);
-   ev = cmdQueue.enqueueNDRangeKernel(kSpinB, 2, [], [n,n2], [8,8], [ev]);
-   cmdQueue.flush();
-   tmp = iSpinB1;  iSpinB1 = iSpinB;  iSpinB = tmp;
+    try {
+        cmdQueue.enqueueNDRangeKernel(kSpinW, null, new Int32Array([n,n2]), new Int32Array([8,8]));
+    } catch (e) {
+        console.error(e);
+        throw e;
+    }
+    cmdQueue.flush();
+    //var tmp = iSpinW1;  iSpinW1 = iSpinW;  iSpinW = tmp;
+
+    cmdQueue.enqueueCopyImage(iSpinW1, iTemp, new Int32Array([0, 0, 0]), new Int32Array([0, 0, 0]),
+            new Int32Array([n, n2, 1]));
+
+    cmdQueue.enqueueCopyImage(iSpinW, iSpinW1, new Int32Array([0, 0, 0]), new Int32Array([0, 0, 0]),
+            new Int32Array([n, n2, 1]));
+
+    cmdQueue.enqueueCopyImage(iTemp, iSpinW, new Int32Array([0, 0, 0]), new Int32Array([0, 0, 0]),
+            new Int32Array([n, n2, 1]));
+
+    kSpinB.setArg(0, iSpinB);
+    kSpinB.setArg(1, iSpinW);
+    kSpinB.setArg(2, iSpinB1);
+    cmdQueue.enqueueNDRangeKernel(kSpinB, null, new Int32Array([n,n2]), new Int32Array([8,8]));
+    cmdQueue.flush();
+
+    //tmp = iSpinB1;  iSpinB1 = iSpinB;  iSpinB = tmp;
+
+    cmdQueue.enqueueCopyImage(iSpinB1, iTemp, new Int32Array([0, 0, 0]), new Int32Array([0, 0, 0]),
+            new Int32Array([n, n2, 1]));
+
+    cmdQueue.enqueueCopyImage(iSpinB, iSpinB1, new Int32Array([0, 0, 0]), new Int32Array([0, 0, 0]),
+            new Int32Array([n, n2, 1]));
+
+    cmdQueue.enqueueCopyImage(iTemp, iSpinB, new Int32Array([0, 0, 0]), new Int32Array([0, 0, 0]),
+            new Int32Array([n, n2, 1]));
   }
-  kPix.setKernelArg(0, iSpinB);
-  kPix.setKernelArg(1, iSpinW);
-  ev = cmdQueue.enqueueNDRangeKernel(kPix, 2, [], [n,n], [8,8], [ev]);
-  ev = cmdQueue.enqueueReadBuffer (bufPix, true, 0, bufSize, outBuffer, [ev]);    
-  draw_gl(n, n, outBuffer);
-  frames++;
+
+  kPix.setArg(0, iSpinB);
+  kPix.setArg(1, iSpinW);
+
+  cmdQueue.enqueueNDRangeKernel(kPix, null, new Int32Array([n,n]), null);
+  cmdQueue.enqueueReadBuffer (bufPix, true, 0, bufSize, outBuffer);
+  
+  try {
+      draw_gl(n, n, outBuffer);
+      frames++;
+  } catch (e) {
+      console.error(e);
+      throw e;
+  }
 }
+
 function anim(){
    draw();
    switch ( animation ){
      case "reset":
-      var spin = new Float32Array(n*n2);    
+      var spin = new Float32Array(n*n2);
       for ( var i = 0; i < n*n2;  i++ ) spin[i] = Math.random();
-      cmdQueue.enqueueWriteImage(iSpinB, true, [0,0,0], [n,n2,1],0,0, spin, []);
+      cmdQueue.enqueueWriteImage(iSpinB, true, new Int32Array([0,0,0]), new Int32Array([n,n2,1]),
+              new Int32Array([0]), spin);
       for ( var i = 0; i < n*n2;  i++ ) spin[i] = Math.random();
-      cmdQueue.enqueueWriteImage(iSpinW, true, [0,0,0], [n,n2,1],0,0, spin, []);
+      cmdQueue.enqueueWriteImage(iSpinW, true, new Int32Array([0,0,0]), new Int32Array([n,n2,1]),
+              new Int32Array([0]), spin);
       animation = "animate";
      case "animate":
-       if (delay == 0) requestAnimFrame(anim);
+       if (delay == 0) requestAnimationFrame(anim);
        else setTimeout("requestAnimFrame(anim)", delay);
        break;
      case "stop":
@@ -244,7 +310,7 @@ function setT(v){
 function setIt(val) {
   it = parseInt(val);
 }
-</script> 
+</script>
 <style type="text/css">
   H1{ font-size: 120%; color: green}
   H2{ font-size: 100%; color: green}
@@ -270,7 +336,7 @@ grid. <i>it</i> is the number of MC iterations per frame.
 Therefore vortices appear as point deffects where all colors meet
 together (see <a href="../../Perc/xy.htm">Vortices in the XY model</a>).
 <table><tr><td>
-<img width="250" height="150" title="xy" src="../fig/xy.jpg">
+<img width="250" height="150" title="xy" src="fig/xy.jpg">
 </td><td>
 You can watch vortices formation from random spin configuration.
 Vortex and anti-vortex attract and annihilate (in a while) each other.
