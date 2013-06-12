@@ -1,0 +1,527 @@
+<html>
+<head>
+<title>WebCL Sobel Filter</title>
+<meta http-equiv="CACHE-CONTROL" content="NO-CACHE">
+
+<style type="text/css">
+.info {
+	font-family: Arial, Helvetica, sans-serif;
+	font-weight: bold;
+	font-size: 14px;
+	color: white;
+	text-align: right;
+}
+.rad {
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 14px;
+	color: white;
+	text-align: right;
+}
+.push {
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 12px;
+	color: black;
+	text-align: right;
+}
+</style>
+
+<!-- <script src="opencl.js"></script> -->
+
+<script id="sobel_filter" type="x-kernel">
+	__kernel void sobel_filter(
+		__global float* input,
+		__global float* output,
+		const    uint    width,
+  		const    uint    height)
+	{
+		uint x = get_global_id(0);
+		uint y = get_global_id(1);
+
+		float Gx[4];
+		float Gy[4];
+
+		int c = (x*4) + (y * width * 4);
+		int k;
+
+		/* Read each texel component and calculate the filtered value using neighbouring texel components */
+		if( x >= 1 && x < (width-1) && y >= 1 && y < height - 1)
+		{
+			float i00[4];
+			float i10[4];
+			float i20[4];
+			float i01[4];
+			float i11[4];
+			float i21[4];
+			float i02[4];
+			float i12[4];
+			float i22[4];
+			for(k=0; k<4; k++) {
+				i00[k] = (float) input[(c - 4 - 4*width)+k];
+				i10[k] = (float) input[(c - 4*width)+k];
+				i20[k] = (float) input[(c + 4 - 4*width)+k];
+				i01[k] = (float) input[(c - 4)+k];
+				i11[k] = (float) input[c+k];
+				i21[k] = (float) input[(c + 4)+k];
+				i02[k] = (float) input[(c - 4 + 4*width)+k];
+				i12[k] = (float) input[(c + 4*width)+k];
+				i22[k] = (float) input[(c + 4 + 4*width)+k];
+
+				Gx[k] =   i00[k] + 2*i10[k] + i20[k] - i02[k]  - 2*i12[k] - i22[k];
+
+				Gy[k] =   i00[k] - i20[k]  + 2*i01[k] - 2*i21[k] + i02[k]  -  i22[k];
+
+				/* taking root of sums of squares of Gx and Gy */
+				output[c+k] = (float) (hypot(Gx[k], Gy[k]))/2;
+			}
+		}
+	}
+</script>
+
+<script>
+function getKernel (id ) {
+	var kernelScript = document.getElementById( id );
+	if(kernelScript === null || kernelScript.type !== "x-kernel")
+		return null;
+
+	//if(kernelScript.text !== null) return kernelScript.text; // old IE
+
+	return kernelScript.firstChild.textContent;
+}
+</script>
+
+<script>
+var err;									// error code returned from API calls
+
+var blockSizeX;
+var blockSizeY;
+
+var cl;										// OpenCL context
+var platform_ids;							// array of OpenCL platform ids
+var platform_id;							// OpenCL platform id
+var device_ids;								// array of OpenCL device ids
+var device_id;								// OpenCL device id
+var context;								// OpenCL context
+var queue;									// OpenCL command queue
+var program;								// OpenCL program
+var kernel;									// OpenCL kernel
+var inputBuffer;							// OpenCL buffer
+var outputBuffer;							// OpenCL buffer
+
+var jsInputImage;							// JavaScript image
+var inputCanvas;
+var outputCanvas;
+var inputContext;
+var outputContext;
+
+var tStart;									// start filter timestamp
+var tEnd;									// end filter timestamp
+
+var globalThreads	= null;
+var localThreads	= null;
+var useGPU 			= true;
+
+function InitCL()
+{
+	cl = new WebCLComputeContext();
+
+	if(cl === null)
+	{
+		console.error("Failed to create WebCL context");
+		return;
+	}
+
+	// Select a compute device
+    //
+    platform_ids = cl.getPlatformIDs();
+    if (cl.getError() !== cl.SUCCESS)
+    {
+        console.error("Failed to get platform IDs");
+        return;
+    }
+	if(platform_ids.length === 0)
+	{
+		console.error("No platforms available");
+		return;
+	}
+	platform_id = platform_ids[0];
+
+    // Select a compute device
+    //
+    device_ids = cl.getDeviceIDs(platform_id, useGPU ? cl.DEVICE_TYPE_GPU : cl.DEVICE_TYPE_CPU);
+    if (cl.getError() !== cl.SUCCESS)
+    {
+        console.error("Failed to get device IDs");
+        return;
+    }
+ 	if(device_ids.length === 0)
+ 	{
+ 		console.error("No devices available");
+ 		return;
+ 	}
+	device_id = device_ids[0];
+
+    // Create a compute context
+    //
+    context = cl.createContext(null, device_id, null, null);
+    if (cl.getError() !== cl.SUCCESS)
+    {
+        console.error("Failed to create a compute context");
+        return;
+    }
+
+	// Create a command queue
+    //
+    queue = cl.createCommandQueue(context, device_id, null);
+    if (cl.getError() !== cl.SUCCESS)
+    {
+        console.error("Failed to create a command queue");
+        return;
+    }
+
+    // Create the compute program from the source buffer
+    //
+    var kernelSource = getKernel("sobel_filter");
+    if (kernelSource === null)
+    {
+		console.error("No kernel named: " + "sobel_filter");
+ 		return;
+    }
+
+    program = cl.createProgramWithSource(context, kernelSource);
+    if (cl.getError() !== cl.SUCCESS)
+    {
+        console.error("Failed to create compute program");
+        return;
+    }
+
+    // Build the program executable
+    //
+    cl.buildProgram(program, null, null, null);
+    if (cl.getError() !== cl.SUCCESS)
+    {
+        console.error("Failed to build program executable");
+        var info = cl.getProgramBuildInfo(program, device_id, cl.PROGRAM_BUILD_LOG);
+        console.log(info);
+        return;
+    }
+
+    // Create the compute kernel in the program we wish to run
+    //
+    kernel = cl.createKernel(program, "sobel_filter");
+    if (cl.getError() !== cl.SUCCESS)
+    {
+        console.error("Failed to create compute kernel");
+        return;
+    }
+}
+
+function LoadImage()
+{
+    // Start load of an image from a file
+    //
+    jsInputImage = new Image();
+	jsInputImage.src = "zer512.jpg";
+	jsInputImage.onload = LoadComplete;
+}
+
+function LoadComplete()
+{
+	// Enable filter
+	document.getElementById("btn").disabled = false;
+
+	// Canvas initialization
+	//
+	inputCanvas = document.getElementById("inputCanvas");
+	inputCanvas.width = jsInputImage.width;
+	inputCanvas.height = jsInputImage.height;
+	inputContext = inputCanvas.getContext("2d");
+	inputContext.drawImage(jsInputImage, 0, 0);
+
+	outputCanvas = document.getElementById("outputCanvas");
+	outputCanvas.width = jsInputImage.width;
+	outputCanvas.height = jsInputImage.height;
+	outputContext = outputCanvas.getContext("2d");
+	outputContext.createImageData(jsInputImage.width, jsInputImage.height);
+}
+
+function RunFilter()
+{
+	// Reset output image data
+	//
+	var imageData = outputContext.getImageData(0, 0, outputCanvas.width, outputCanvas.height);
+	for(var i=0; i<imageData.data.length; i++)
+		imageData.data[i] = 0;
+	outputContext.putImageData(imageData, 0, 0);
+
+	var radio = document.getElementById("JSradio");
+	if(radio.checked)
+		RunJavaScriptFilter();
+	else {
+		InitCL();
+		RunOpenCLFilter();
+	}
+}
+
+function RunOpenCLFilter()
+{
+	// Image has loaded so create OpenCL memory objects
+	//
+  	var imageData = inputContext.getImageData(0, 0, inputCanvas.width, inputCanvas.height);
+  	var nPixels = imageData.data.length;
+	var inputData = new Float32Array(nPixels);
+	for (var i=0; i < nPixels; i++) {
+		inputData[i] = imageData.data[i];
+	}
+
+	inputBuffer = cl.createBuffer(context, cl.MEM_READ_ONLY, Float32Array.BYTES_PER_ELEMENT * nPixels, null);
+	outputBuffer = cl.createBuffer(context, cl.MEM_WRITE_ONLY, Float32Array.BYTES_PER_ELEMENT * nPixels, null);
+
+  	if(inputBuffer === null || outputBuffer === null)
+  	{
+		console.error("Failed to create buffers");
+        return;
+  	}
+
+    // Write our image into the input array in device memory
+    //
+    cl.enqueueWriteBuffer(queue, inputBuffer, true, 0, Float32Array.BYTES_PER_ELEMENT * nPixels, inputData, null);
+    if (cl.getError() !== cl.SUCCESS)
+    {
+        console.error("Failed to write to source image");
+        return;
+    }
+
+  	var w = jsInputImage.width;
+  	var h = jsInputImage.height;
+
+    // Set the arguments to our compute kernel
+    //
+    err = 0;
+    err  |= cl.setKernelArgGlobal(kernel, 0, inputBuffer);
+    err  |= cl.setKernelArgGlobal(kernel, 1, outputBuffer);
+    err  |= cl.setKernelArg(kernel, 2, w, cl.KERNEL_ARG_UINT);
+    err  |= cl.setKernelArg(kernel, 3, h, cl.KERNEL_ARG_UINT);
+    if (err !== cl.SUCCESS)
+    {
+        console.error("Failed to set kernel arguments");
+        return;
+    }
+
+
+	// Get the maximum work group size for executing the kernel on the device
+	//
+	var maxWorkGroupSize = cl.getKernelWorkGroupInfo(kernel, device_id, cl.KERNEL_WORK_GROUP_SIZE);
+	if (cl.getError() !== cl.SUCCESS)
+	{
+		console.error("Failed to retrieve kernel work group info");
+		return;
+	}
+	console.log("maxWorkGroupSize: " + maxWorkGroupSize);
+
+	blockSizeY = 1;
+	blockSizeX = jsInputImage.width;
+	while(blockSizeX > maxWorkGroupSize)
+		blockSizeX = Math.ceil(blockSizeX/2);
+
+	globalThreads = [w, h];
+	localThreads  = [blockSizeX, blockSizeY];
+
+	console.log("globalThreads[0]: " + globalThreads[0]);
+	console.log("globalThreads[1]: " + globalThreads[0]);
+	console.log("localThreads[0]: " + localThreads[0]);
+	console.log("localThreads[1]: " + localThreads[1]);
+
+    tStart = new Date().valueOf();
+    cl.enqueueNDRangeKernel(queue, kernel, 2, 0, new Int32Array(globalThreads), new Int32Array(localThreads), null);
+    if (cl.getError() !== cl.SUCCESS)
+    {
+        console.error("Failed to execute kernel");
+        return;
+    }
+
+    // Wait for the command queue to get serviced before reading back results
+    //
+    cl.finish(queue, GetResults, cl);
+}
+
+function  GetResults(cl)
+{
+	tEnd = new Date().valueOf();
+
+	var imageData = outputContext.getImageData(0, 0, outputCanvas.width, outputCanvas.height);
+  	var nPixels = imageData.data.length;
+	var outputData = new Float32Array(nPixels);
+
+    // Read back the results from the device to verify the output
+    //
+	cl.enqueueReadBuffer(queue, outputBuffer, true, 0, Float32Array.BYTES_PER_ELEMENT * nPixels, outputData, null);
+
+    if (err !== cl.SUCCESS)
+    {
+        console.error("Failed to read output array");
+        return;
+    }
+
+	for (var i = 0; i < nPixels; i+=4) {
+		imageData.data[i] = outputData[i];
+		imageData.data[i+1] = outputData[i+1];
+		imageData.data[i+2] = outputData[i+2];
+		imageData.data[i+3] = 255;
+	}
+
+    outputContext.putImageData(imageData, 0, 0);
+
+    // Shutdown and cleanup
+    //
+    cl.releaseMemObject(inputBuffer);
+    cl.releaseMemObject(outputBuffer);
+    cl.releaseProgram(program);
+    cl.releaseKernel(kernel);
+    cl.releaseCommandQueue(queue);
+    cl.releaseContext(context);
+
+	ShowResults();
+}
+
+function TerminateCL()
+{
+	// Shutdown and cleanup
+	//
+	if(cl !== null)
+	{
+		cl.releaseMemObject(inputBuffer);
+		cl.releaseMemObject(outputBuffer);
+		cl.releaseProgram(program);
+		cl.releaseKernel(kernel);
+		cl.releaseCommandQueue(queue);
+		cl.releaseContext(context);
+	}
+}
+
+function SwitchMode()
+{
+	var radio = document.getElementById("JSradio");
+	if(radio.checked)
+  		document.getElementById("corg").style.visibility = "hidden";
+  	else
+		document.getElementById("corg").style.visibility = "visible";
+}
+
+function ShowResults()
+{
+	var delta = Math.max(1, tEnd - tStart);
+
+	document.getElementById("timeText").firstChild.nodeValue = delta + " ms"
+
+  	document.getElementById("outputCanvas").style.visibility = "visible";
+	document.getElementById("timeText").style.visibility = "visible";
+}
+
+function HideResults()
+{
+  	document.getElementById("outputCanvas").style.visibility = "hidden";
+	document.getElementById("timeText").style.visibility = "hidden";
+}
+
+function RunJavaScriptFilter()
+{
+	// For testing, set to true to test basic imageData update
+	var nullFilter = false;
+
+	var width = inputCanvas.width;
+	var height = inputCanvas.height;
+
+	var inputImageData = inputContext.getImageData(0, 0, width, height);
+	var outputImageData = outputContext.getImageData(0, 0, width, height);
+
+	var inputPixels = inputImageData.data;
+	var outputPixels = outputImageData.data;
+
+	var I = function(off) { return [inputPixels[off+0]/255, inputPixels[off+1]/255, inputPixels[off+2]/255, inputPixels[off+3]/255]; };
+	var O = function(off, p) { outputPixels[off+0] = 255*p[0]; outputPixels[off+1] = 255*p[1]; outputPixels[off+2] = 255*p[2]; outputPixels[off+3] = 255; };
+
+	tStart = new Date().valueOf();
+	for(var x=0; x<width; x++) {
+		for(var y=0; y<height; y++) {
+			var Gx = [0, 0, 0, 0];
+			var Gy = [0, 0, 0, 0];
+			var C =  [0, 0, 0, 0];
+
+			// Original
+			// var c = x + y * width;
+			var c = (x*4) + (y * width * 4);
+
+			/* Read each texel component and calculate the filtered value using neighbouring texel components */
+			if( x >= 1 && x < (width-1) && y >= 1 && y < height - 1)
+			{
+				var i00 = I(c - 4 - 4*width);
+				var i10 = I(c - 4*width);
+				var i20 = I(c + 4 - 4*width);
+				var i01 = I(c - 4);
+				var i11 = I(c);
+				var i21 = I(c + 4);
+				var i02 = I(c - 4 + 4*width);
+				var i12 = I(c + 4*width);
+				var i22 = I(c + 4 + 4*width);
+
+				for(var i=0; i<4; i++) {
+					Gx[i] = i00[i] + 2*i10[i] + i20[i] - i02[i] - 2*i12[i] - i22[i];
+					Gy[i] = i00[i] - i20[i] + 2*i01[i] - 2*i21[i] + i02[i] - i22[i];
+					C[i]  = Math.sqrt(Gx[i]*Gx[i] + Gy[i]*Gy[i])/2;
+				}
+
+				// Update outputPixels
+				nullFilter ? O(c, I(c)) : O(c, C);
+
+				// Original
+				/*
+				float4 i00 = convert_float4(inputImage[c - 1 - width]);
+				float4 i10 = convert_float4(inputImage[c - width]);
+				float4 i20 = convert_float4(inputImage[c + 1 - width]);
+				float4 i01 = convert_float4(inputImage[c - 1]);
+				float4 i11 = convert_float4(inputImage[c]);
+				float4 i21 = convert_float4(inputImage[c + 1]);
+				float4 i02 = convert_float4(inputImage[c - 1 + width]);
+				float4 i12 = convert_float4(inputImage[c + width]);
+				float4 i22 = convert_float4(inputImage[c + 1 + width]);
+
+				Gx =   i00 + (float4)(2) * i10 + i20 - i02  - (float4)(2) * i12 - i22;
+				Gy =   i00 - i20  + (float4)(2)*i01 - (float4)(2)*i21 + i02  -  i22;
+				outputImage[c] = convert_uchar4(hypot(Gx, Gy)/(float4)(2));
+				*/
+			}
+		}
+	}
+	tEnd = new Date().valueOf();
+
+	outputContext.putImageData(outputImageData, 0, 0);
+	ShowResults();
+}
+</script>
+</head>
+
+<body onLoad="LoadImage()" onUnload="TerminateCL()" bgcolor="black">
+<div style="position:absolute; left:0px; top:0px">
+	<div style="position:absolute; left:20px; top:10px; width:128px;">
+		<button id="btn" class="push" onclick="RunFilter()">Run Filter</button>
+	</div>
+	<div style="position:absolute; left:120px; top:15px;"><input type="radio" name="r1" id="JSradio" onclick="SwitchMode();HideResults()" checked="true"></div>
+	<div style="position:absolute; left:140px; top:15px;" class="rad">JavaScript</div>
+	<div style="position:absolute; left:220px; top:15px;"><input type="radio" name="r1" id="WCradio" onclick="SwitchMode();HideResults()"></div>
+	<div style="position:absolute; left:240px; top:15px;" class="rad">WebCL</div>
+
+	<div style="position:absolute; left:280px; top:15px; width: 96px; visibility: hidden; " class="info" id="timeText">  ms</div>
+
+	<div style="visibility: hidden;" id="corg">
+		<div style="position:absolute; left:420px; top:15px;"><input type="radio" name="r2" id="CPU" onclick="useGPU=false;HideResults()"></div>
+		<div style="position:absolute; left:440px; top:15px;" class="rad">CPU</div>
+		<div style="position:absolute; left:490px; top:15px;"><input type="radio" name="r2" id="GPU" onclick="useGPU=true;HideResults()" checked="true"></div>
+		<div style="position:absolute; left:510px; top:15px;" class="rad">GPU</div>
+	</div>
+
+	<div style="position:absolute; left: 20px; top:40px; width:512px;"><canvas id="inputCanvas" width="512" height="512"></canvas></div>
+	<div style="position:absolute; left:552px; top:40px; width:512px;"><canvas id="outputCanvas" style="visibility: visible;" width="512" height="512"></canvas></div>
+
+</div>
+
+</body></html>
