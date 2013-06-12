@@ -1,0 +1,301 @@
+<html><head>
+<TITLE>3D XY model. Vortex lines</TITLE>
+
+<script src="../../webgl/CanvasMatrix.js" type="text/javascript"></script>
+<script src="xy3d_gl.js" type="text/javascript"></script>
+
+<script id="clXY" type="text/x-opencl">
+
+constant int n = 64, m = 63,  sh = 6,  sh2 = 12;
+
+float en( float x ){
+  const float pi2 = M_PI_F + M_PI_F;
+  return native_cos(pi2 * x);
+}
+
+__kernel void kSpin(global float* s, global uint* rand, int bw, float rT ){
+  int x = get_global_id(0),  y = get_global_id(1),  ny = (y<<sh),
+    z = get_global_id(2),  nnz = (z<<sh2);
+  int  t = x + ny + nnz;
+  float sn = s[t];
+  if ( ((x + y + z) & 1) == bw) return;
+  uint r = 1664525u * rand[t] + 1013904223u;
+  float s0 = sn;
+  sn += (r/4294967295.0f - .5f)*.1f + 1.0f;
+  sn -= floor(sn);
+  r = 1664525u * r + 1013904223u;
+  rand[t] = r;
+
+  float si = s[((x + 1)&m) + ny + nnz];
+  float e = en(si - s0) - en(si - sn);
+  si = s[((x + m)&m) + ny + nnz];
+  e += en(si - s0) - en(si - sn);
+  si = s[x + (((y + 1)&m)<<sh) + nnz];
+  e += en(si - s0) - en(si - sn);
+  si = s[x + (((y + m)&m)<<sh) + nnz];
+  e += en(si - s0) - en(si - sn);
+  si = s[x + ny + (((z + 1)&m)<<sh2)];
+  e += en(si - s0) - en(si - sn);
+  si = s[x + ny + (((z + m)&m)<<sh2)];
+  e += en(si - s0) - en(si - sn);
+
+  if (r > 4294967295.0f*native_exp(-e*rT)) sn = s0;
+  s[t] = sn;
+}
+
+int iClamp(int i){
+  return min( max( 0, i), 255 );
+}
+float angle(float a){
+  if( a > 0.5f) return a - 1.0f;
+  else if( a > -0.5f) return a;
+  else return a + 1.0f;
+}
+
+__kernel void kPix(global float* s, global uchar4* pix) {
+  int x = get_global_id(0),  y = get_global_id(1),  ny = (y<<sh),
+    z = get_global_id(2),  nnz = (z<<sh2);
+  int x1 = (x + 1)&m,  y1 = ((y + 1)&m)<<sh, z1 = ((z + 1)&m)<<sh2;
+  float s0 = s[x + ny + nnz];
+  float sx = s[x1+ ny + nnz];
+  float sy = s[x + y1 + nnz];
+  float sz = s[x + ny + z1];
+  int vort = 0;
+  float t = s[x1 + y1 + nnz];
+  float sum = angle(sx - s0) + angle(t - sx) + angle(sy - t) + angle(s0 - sy);
+  if (fabs(sum) > 0.9f) vort = 1;
+  t = s[x + y1 + z1];
+  sum = angle(sy - s0) + angle(t - sy) + angle(sz - t) + angle(s0 - sz);
+  if (fabs(sum) > 0.9f) vort = 1;
+  t = s[x1 + ny + z1];
+  sum = angle(sz - s0) + angle(t - sz) + angle(sx - t) + angle(s0 - sx);
+  if (fabs(sum) > 0.9f) vort = 1;
+  if (vort == 1)
+    pix[x + ny + nnz] = (uchar4)(255,255,255,0);
+  else{
+    int c = (int)( s0 * 1536.0f );
+    pix[x + ny + nnz] = (uchar4)(
+      iClamp( (int)abs(c - 768) - 256 ),
+      iClamp( 512 - (int)abs(c - 512) ),
+      iClamp( 512 - (int)abs(c - 1024) ),
+      255);
+  }
+}
+</script>          
+            
+<script id="shader-vs" type="x-shader/x-vertex"> 
+  const float n = 64.;
+
+  attribute vec3 aPos;
+  uniform mat4 mvMatrix;
+  uniform mat4 prMatrix;
+  uniform float pSize;
+  uniform int spin;
+  uniform sampler2D uTexSamp;
+  varying vec4 color;
+void main(void) {
+   vec4 p = prMatrix * mvMatrix * vec4(aPos, 1.);
+   color = texture2D(uTexSamp, vec2(aPos.x, aPos.y/n + aPos.z ));
+   if(spin == 0){
+     p = (color.a == 0.) ? p : vec4(1000.,0.,0.,1.);}
+   color.a = 1.;
+   gl_Position = p;
+   gl_PointSize = pSize;
+}
+</script> 
+ 
+<script id="shader-fs" type="x-shader/x-fragment"> 
+#ifdef GL_ES
+precision highp float;
+#endif
+  varying vec4 color;
+void main(void) {
+   gl_FragColor = color;
+}
+</script> 
+
+<script type="text/javascript"> 
+
+function loadKernel ( id ){
+   var shaderScript = document.getElementById ( id );
+   var str = "";
+   var k = shaderScript.firstChild;
+   while ( k ){
+     if ( k.nodeType == 3 ) str += k.textContent;
+     k = k.nextSibling;
+   }
+   return str;
+}
+
+var T = 0.02, n = 64, it = 10, ev,
+    delay = 0, ctx_c, frames = 0, animation = "animate", time;
+var kSpin, kPix, cmdQueue, bSpin, bufPix, outBuffer, bufSize = 4*n*n*n;
+
+function CL_rand () {
+  try {
+    if (window.WebCL == undefined) {
+      alert("Unfortunately your system does not support WebCL");
+      return false;
+    }
+    var platforms = WebCL.getPlatformIDs();
+    var ctx = WebCL.createContextFromType ([WebCL.CL_CONTEXT_PLATFORM, 
+       platforms[0]], WebCL.CL_DEVICE_TYPE_DEFAULT);
+    var devices = ctx.getContextInfo(WebCL.CL_CONTEXT_DEVICES);
+
+    var UIrand = new Uint32Array(n*n*n);    
+    for ( var i = 0; i < n*n*n;  i++ )
+      UIrand[i] = Math.floor(Math.random() * 4294967295);
+    var spin = new Float32Array(n*n*n);    
+    for ( var i = 0; i < n*n*n;  i++ ) spin[i] = Math.random();
+    var bufRand = ctx.createBuffer (WebCL.CL_MEM_READ_WRITE, 4*n*n*n);
+    bSpin  = ctx.createBuffer (WebCL.CL_MEM_READ_WRITE, 4*n*n*n);
+    bufPix = ctx.createBuffer (WebCL.CL_MEM_WRITE_ONLY, 4*n*n*n);
+
+    var kernelSrc = loadKernel("clXY");
+    var program = ctx.createProgramWithSource(kernelSrc);
+    try {
+      program.buildProgram ([devices[0]], "");
+    } catch(e) {
+      alert ("Failed to build WebCL program. Error "
+        + program.getProgramBuildInfo (devices[0],
+           WebCL.CL_PROGRAM_BUILD_STATUS)
+        + ":  " + program.getProgramBuildInfo (devices[0], 
+           WebCL.CL_PROGRAM_BUILD_LOG));
+      throw e;
+    }
+    kSpin = program.createKernel ("kSpin");
+    kSpin.setKernelArg(0, bSpin);
+    kSpin.setKernelArg(1, bufRand);
+    kSpin.setKernelArg(3, 1/T, WebCL.types.FLOAT);
+    kPix = program.createKernel("kPix");
+    kPix.setKernelArg(0, bSpin);
+    kPix.setKernelArg(1, bufPix);
+            
+    cmdQueue = ctx.createCommandQueue (devices[0], 0);
+    cmdQueue.enqueueWriteBuffer(bSpin, true, 0, 4*n*n*n, spin, []);
+    ev = cmdQueue.enqueueWriteBuffer(bufRand, true, 0, 4*n*n*n, UIrand, []);
+    outBuffer = new Uint8Array(4*n*n*n);
+  } catch(e) {
+    document.getElementById("output").innerHTML 
+      += "<h3>ERROR:</h3><pre style=\"color:red;\">" + e.message + "</pre>";
+    throw e;
+  }
+  canvas = document.getElementById("c");
+  init_gl();
+  
+  time = new Date().getTime();
+  setInterval(fr, 500);
+  anim();
+}
+function step(){
+  for ( var i = 0; i < it;  i++ ){
+   kSpin.setKernelArg(2, 0, WebCL.types.INT);
+   ev = cmdQueue.enqueueNDRangeKernel(kSpin, 3, [], [n,n,n],[4,4,4], [ev]);
+   cmdQueue.flush();
+
+   kSpin.setKernelArg(2, 1, WebCL.types.INT);
+   ev = cmdQueue.enqueueNDRangeKernel(kSpin, 3, [], [n,n,n],[4,4,4], [ev]);
+   cmdQueue.flush();
+  }
+  ev = cmdQueue.enqueueNDRangeKernel(kPix, 3, [], [n,n,n], [4,4,4], [ev]);
+  cmdQueue.enqueueReadBuffer (bufPix, true, 0, bufSize, outBuffer, [ev]);    
+   gl.bindTexture(gl.TEXTURE_2D, tex_gl);
+   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, n, n*n, 0,
+     gl.RGBA, gl.UNSIGNED_BYTE, outBuffer);
+  draw();
+  frames++;
+}
+function anim(){
+   step();
+   switch ( animation ){
+     case "reset":
+      var spin = new Float32Array(n*n*n);    
+      for ( var i = 0; i < n*n*n;  i++ ) spin[i] = Math.random();
+      cmdQueue.enqueueWriteBuffer(bSpin, true, 0, 4*n*n*n, spin, []);
+      animation = "animate";
+     case "animate":
+       if (delay == 0) requestAnimFrame(anim);
+       else setTimeout("requestAnimFrame(anim)", delay);
+       break;
+     case "stop":
+       break;
+   }
+}
+function run(v) {
+  if( animation == "animate" ){
+    animation = "stop";
+    document.getElementById('runBtn').value = "Run ";}
+  else{
+    animation = "animate";
+    document.getElementById('runBtn').value = "Stop";
+    anim();
+  }
+}
+function reset() {
+  if( animation == "stop" ){
+    animation = "reset";
+    document.getElementById('runBtn').value = "Stop";
+    anim();}
+  else animation = "reset";
+}
+function setDelay(val) {
+  delay = parseInt(val);
+}
+function fr(){
+  var ti = new Date().getTime();
+  var fps = Math.round(1000*frames/(ti - time));
+  document.getElementById("framerate").value = fps;
+  frames = 0;  time = ti;
+}
+function setT(v){
+  var T = v.valueOf();
+  kSpin.setKernelArg (3, 1/T, WebCL.types.FLOAT);
+}
+function setPsize(v){
+   gl.uniform1f( gl.getUniformLocation(prog, "pSize"), v.valueOf());
+   draw();
+}
+function setSpin(v) {
+   gl.uniform1i( gl.getUniformLocation(prog, "spin"), v);
+   draw();
+}
+function setIt(val) {
+  it = parseInt(val);
+}
+</script> 
+<style type="text/css">
+  H1{ font-size: 120%; color: green}
+  H2{ font-size: 100%; color: green}
+  pre{ color: darkblue}
+</style>
+</head><body onload="CL_rand ()" onresize="canvas.resize()">
+
+<p id="output"></p>
+<canvas id="c" width="512" height="512"></canvas>
+<br><button onclick="reset()">Reset</button>
+<input type="button" onclick="run()" value="Stop" size="1" id="runBtn">
+T<input size="4" value="0.02" onchange="setT( this.value )">
+It<input size="1" value="10" onchange="setIt( this.value )">
+spin<input type="checkbox" onclick="setSpin(checked)" checked>
+size<input size="1" value="5" onchange="setPsize( this.value )">
+delay<input size="2" value="0" onchange="setDelay( this.value )">
+fps<input size="2" id="framerate">
+
+<br>Drag mouse to rotate model. Hold <i>shift</i> key or use mouse wheel
+to zoom it (canvas is matched to the browser window). <i>it</i> is the number
+of MC iterations per frame. Uncheck <i>spin</i> to see vortex lines.
+
+<table><tr><td>
+<img width="250" height="150" title="3D xy" src="../fig/xy3d.gif">
+</td><td>
+GPU based Monte-Carlo simulation of the 3D XY model on the cubic
+64&times;64&times;64 grid. Different colors correspond to different spin
+phases. Vortex cores are white. They make closed loops and collapse in a while.
+See <a href="../../Perc/xy.htm#vort">Vortices in the XY model</a>.
+</td></tr></table>
+<a href="xy3d.html">XY model with textures</a> is a litle faster.
+
+<hr><a href="../webcl.htm">WebCL Demos</a>
+&nbsp; &nbsp; <i>updated</i> 5 Nov 2011
+
+</body></html>
