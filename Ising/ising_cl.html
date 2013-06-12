@@ -1,7 +1,12 @@
+<!--
+    Based on http://www.ibiblio.org/e-notes/webcl/mc/ising_cl.html
+-->
+
 <html><head>
 <TITLE>Ising model. Chess-board algorithm</TITLE>
 
-<script src="../cl_gl.js" type="text/javascript"></script>
+<script src="../common/gl.js" type="text/javascript"></script>
+<script src="../common/webcl.js" type="text/javascript"></script>
 
 <script id="clIsing" type="text/x-opencl">
 
@@ -37,9 +42,9 @@ __kernel void kPix(read_only image2d_t s, read_only image2d_t s1,
   c *= 255;
   pix[x + n*y] = (uchar4)(c,c,c,255);
 }
-</script>          
-            
-<script type="text/javascript"> 
+</script>
+
+<script type="text/javascript">
 
 function loadKernel ( id ){
    var shaderScript = document.getElementById ( id );
@@ -54,87 +59,93 @@ function loadKernel ( id ){
 
 var ctx_c, n = 512, it = 100, bufSize = 4*n*n, bufW, ev,
     frames = 0, animation = "animate", time, delay = 0;
-var kSpin, kPix, cmdQueue, iSpin, iSpin1, bufW, bufPix, outBuffer;
+var kSpin, kPix, cmdQueue, iSpin, iSpin1, bufRand, bufW, bufWSize=4*5, bufPix, outBuffer;
+var types = WebCLKernelArgumentTypes;
+var useGPU = false;
 
 function CL_rand () {
   try {
-    if (window.WebCL == undefined) {
-      alert("Unfortunately your system does not support WebCL");
-      return false;
-    }
-    var platforms = WebCL.getPlatformIDs();
-    var ctx = WebCL.createContextFromType ([WebCL.CL_CONTEXT_PLATFORM, 
-       platforms[0]], WebCL.CL_DEVICE_TYPE_DEFAULT);
-    var devices = ctx.getContextInfo(WebCL.CL_CONTEXT_DEVICES);
-
-    var UIrand = new Uint32Array(n*n);    
-    for ( var i = 0; i < n*n;  i++ )
-      UIrand[i] = Math.floor(Math.random() * 4294967295);
-    var spin = new Int8Array(n*n);    
-    for ( var i = 0; i < n*n;  i++ )
-      spin[i] = Math.floor(Math.random() * 1.999999);
-    var bufRand = ctx.createBuffer (WebCL.CL_MEM_READ_WRITE, 4*n*n);
-    bufW = ctx.createBuffer (WebCL.CL_MEM_READ_ONLY, 4*5);
-    var format={channelOrder:WebCL.CL_R, channelDataType:WebCL.CL_SIGNED_INT8};
-    iSpin  = ctx.createImage2D(WebCL.CL_MEM_READ_WRITE, format, n, n, 0);
-    iSpin1 = ctx.createImage2D(WebCL.CL_MEM_READ_WRITE, format, n, n, 0);
-    bufPix  = ctx.createBuffer (WebCL.CL_MEM_WRITE_ONLY, 4*n*n);
-
+    WebCLCommon.init(useGPU ? "GPU" : "CPU");
+    var ctx = WebCLCommon.createContext();
     var kernelSrc = loadKernel("clIsing");
-    var program = ctx.createProgramWithSource(kernelSrc);
-    try {
-      program.buildProgram ([devices[0]], "");
-    } catch(e) {
-      alert ("Failed to build WebCL program. Error "
-        + program.getProgramBuildInfo (devices[0],
-           WebCL.CL_PROGRAM_BUILD_STATUS)
-        + ":  " + program.getProgramBuildInfo (devices[0], 
-           WebCL.CL_PROGRAM_BUILD_LOG));
-      throw e;
-    }
+    var program = WebCLCommon.createProgramBuild(kernelSrc);
+
+    cmdQueue = WebCLCommon.createCommandQueue();
+
+    bufRand = ctx.createBuffer(webcl.MEM_READ_WRITE, bufSize);
+    bufW = ctx.createBuffer(webcl.MEM_READ_ONLY, bufWSize);
+
+    var descriptor = {channelOrder:webcl.RGBA, channelDataType:webcl.SIGNED_INT8,
+                      width:n, height:n, rowPitch:0};
+    iSpin  = ctx.createImage(webcl.MEM_READ_WRITE, descriptor);
+    iSpin1 = ctx.createImage(webcl.MEM_READ_WRITE, descriptor);
+    bufPix  = ctx.createBuffer(webcl.MEM_WRITE_ONLY, bufSize);
+
+    initImageSpin();
+
     kSpin = program.createKernel("kSpin");
-    kSpin.setKernelArg(1, bufRand);
-    kSpin.setKernelArg(4, bufW);
+    kSpin.setArg(1, bufRand);
+    kSpin.setArg(4, bufW);
     kPix = program.createKernel("kPix");
-    kPix.setKernelArg(0, iSpin);
-    kPix.setKernelArg(1, iSpin1);
-    kPix.setKernelArg(2, bufPix);
+    kPix.setArg(0, iSpin);
+    kPix.setArg(1, iSpin1);
+    kPix.setArg(2, bufPix);
+
     var T = 1,  w = new Float32Array(5);
     for(var i = 0; i < 5; i++)
       w[i] = 4294967295/(1 + Math.exp(2*(2*i - 4)/T));
-    cmdQueue = ctx.createCommandQueue (devices[0], 0);
-    cmdQueue.enqueueWriteBuffer(bufW, true, 0, 4*5, w, []);
-    cmdQueue.enqueueWriteImage(iSpin, true, [0,0,0], [n,n,1], 0, 0, spin, []);
-    cmdQueue.enqueueWriteImage(iSpin1, true, [0,0,0], [n,n,1], 0, 0, spin, []);
-    ev = cmdQueue.enqueueWriteBuffer(bufRand, true, 0, 4*n*n, UIrand, []);
-    outBuffer = new Uint8Array(4*n*n);
+    cmdQueue.enqueueWriteBuffer(bufW, true, 0, bufWSize, w);
+
+    var UIrand = new Uint32Array(n*n);
+    for ( var i = 0; i < n*n;  i++ )
+      UIrand[i] = Math.floor(Math.random() * 4294967295);
+    cmdQueue.enqueueWriteBuffer(bufRand, true, 0, bufSize, UIrand);
+
+    outBuffer = new Uint8Array(bufSize);
+
   } catch(e) {
-    document.getElementById("output").innerHTML 
+    document.getElementById("output").innerHTML
       += "<h3>ERROR:</h3><pre style=\"color:red;\">" + e.message + "</pre>";
     throw e;
   }
   var canvas = document.getElementById("c");
-  init_gl(canvas);
+  init_gl(canvas, false);
   time = new Date().getTime();
   setInterval(fr, 500);
   anim();
 }
+
+function initImageSpin() {
+  var spin = new Int8Array(n*n);
+  for ( var i = 0; i < n*n;  i++ )
+    spin[i] = Math.floor(Math.random() * 1.999999);
+
+  var origin = new Int32Array([0,0,0]);
+  var region = new Int32Array([n,n,1]);
+  var hostRowPitch = new Uint32Array([0]);
+
+  cmdQueue.enqueueWriteImage(iSpin, true, origin, region, hostRowPitch, spin);
+  cmdQueue.enqueueWriteImage(iSpin1, true, origin, region, hostRowPitch, spin);
+}
+
+var globalWorkSize = new Int32Array([n,n]);
 function draw(){
   for ( var i = 0; i < it;  i++ ){
-   kSpin.setKernelArg(0, iSpin);
-   kSpin.setKernelArg(2, iSpin1);
-   kSpin.setKernelArg(3, 0, WebCL.types.INT);
-   ev = cmdQueue.enqueueNDRangeKernel(kSpin, 2, [], [n,n], [8,8], [ev]);
+   kSpin.setArg(0, iSpin);
+   kSpin.setArg(2, iSpin1);
+   kSpin.setArg(3, 0, types.INT);
+   cmdQueue.enqueueNDRangeKernel(kSpin, 0, globalWorkSize, null);
    cmdQueue.flush();
 
-   kSpin.setKernelArg(0, iSpin1);
-   kSpin.setKernelArg(2, iSpin);
-   kSpin.setKernelArg(3, 1, WebCL.types.INT);
-   ev = cmdQueue.enqueueNDRangeKernel(kSpin, 2, [], [n,n], [8,8], [ev]);
+   kSpin.setArg(0, iSpin1);
+   kSpin.setArg(2, iSpin);
+   kSpin.setArg(3, 1, types.INT);
+   cmdQueue.enqueueNDRangeKernel(kSpin, 0, globalWorkSize, null);
    cmdQueue.flush();
   }
-  cmdQueue.enqueueNDRangeKernel(kPix, 2, [], [n,n], [8,8], []);
-  cmdQueue.enqueueReadBuffer (bufPix, true, 0, bufSize, outBuffer, []);    
+  cmdQueue.enqueueNDRangeKernel(kPix, 0, globalWorkSize, null);
+  cmdQueue.enqueueReadBuffer (bufPix, true, 0, bufSize, outBuffer);
+  cmdQueue.finish();
   draw_gl(n, n, outBuffer);
   frames++;
 }
@@ -142,15 +153,11 @@ function anim(){
    draw();
    switch ( animation ){
      case "reset":
-      var spin = new Int8Array(n*n);    
-      for ( var i = 0; i < n*n;  i++ )
-        spin[i] = Math.floor(Math.random() * 1.999999);
-      cmdQueue.enqueueWriteImage(iSpin, true, [0,0,0], [n,n,1], 0, 0, spin, []);
-      cmdQueue.enqueueWriteImage(iSpin1,true, [0,0,0], [n,n,1], 0, 0, spin, []);
-      animation = "animate";
+       initImageSpin();
+       animation = "animate";
      case "animate":
-       if (delay == 0) requestAnimFrame(anim);
-       else setTimeout("requestAnimFrame(anim)", delay);
+       if (delay == 0) requestAnimationFrame(anim);
+       else setTimeout("requestAnimationFrame(anim)", delay);
        break;
      case "stop":
        break;
@@ -187,12 +194,12 @@ function setT(v){
   var w = new Float32Array(5);
   for(var i = 0; i < 5; i++)
     w[i] = 4294967295/(1 + Math.exp(2*(2*i - 4)/T));
-  cmdQueue.enqueueWriteBuffer(bufW, true, 0, 4*5, w, []);
+  cmdQueue.enqueueWriteBuffer(bufW, true, 0, bufWSize, w);
 }
 function setIt(val) {
   it = parseInt(val);
 }
-</script> 
+</script>
 <style type="text/css">
   H1{ font-size: 120%; color: green}
   H2{ font-size: 100%; color: green}
@@ -211,17 +218,8 @@ It<input size="1" value="100" onchange="setIt( this.value )">
 delay<input size="2" value="0" onchange="setDelay( this.value )">
 fps<input size="2" id="framerate">
 
-<p>GPU based Monte-Carlo simulation of the Ising model on the square 512&times;512
+<p>Monte-Carlo simulation of the Ising model on the square 512&times;512
 grid. <i>it</i> is the number of MC iterations per frame. The thermostat
 algorithm and linear congruential random number generator are used.
-
-<p>For low temperature you can watch formation of clusters of ordered phase
-from random state. For <i>T > T<sub>C</sub> = 2.269</i> you will get
-desordered phase, for <i>T &lt; 0</i> the antiferromagnetic model.
-See <a href="../../Perc/contents.htm">Phase transitions on lattices</a>.
-
-
-<hr><a href="../webcl.htm">WebCL Demos</a>
-&nbsp; &nbsp; <i>updated</i> 12 Sep 2011
 
 </body></html>

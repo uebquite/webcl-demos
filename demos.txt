@@ -2,6 +2,7 @@ DEMO              | Compare against pure JS  |   Uses WebGL  |    Uses WebCLGL i
 
 Barkley           |            No            |      Yes      |           No             |        Yes        |      Yes        |
 Fluid Dynamics    |            No            |      Yes      |           No             |        Yes        |      Yes        |
+Ising Model       |            No            |      Yes      |           No             |        No         |      Yes        |
 Mandelbrot Expl.  |            No            |      Yes      |           No             |        Yes        |      Yes        |
 Path Integrals    |            No            |      Yes      |           Yes            |        Yes        |      Yes        |
 Small Path Tracing|            No            |      Yes      |           No             |        Yes        |      No         |
