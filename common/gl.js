@@ -8,8 +8,11 @@ requestAnimationFrame = (function() {
   };
 
 })();
-var flush = false;
-function init_gl( canvas, linear ) {
+
+// The linearFiltering parameter indicates which type of filtering will be used in WebGL.
+// If true, gl.LINEAR filter will be used, if false gl.NEAREST will be used.
+
+function init_gl( canvas, linearFiltering ) {
    gl = canvas.getContext("experimental-webgl");
    if (!gl) {
       alert("Unfortunately your system does not support WebGL");
@@ -17,8 +20,7 @@ function init_gl( canvas, linear ) {
    }
 
    init_shaders();
-   init_buffers( linear );
-   flush = linear;
+   init_buffers( linearFiltering );
 }
 
 var vertexShaderSrc =
@@ -59,7 +61,7 @@ function init_shaders() {
    gl.useProgram(prog);
 }
 
-function init_buffers( linear ) {
+function init_buffers( linearFiltering ) {
    var aPosLoc = gl.getAttribLocation(prog, "aPos");
    var aTexLoc = gl.getAttribLocation(prog, "aTexCoord");
    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
@@ -72,7 +74,7 @@ function init_buffers( linear ) {
    var texture = gl.createTexture();
    gl.bindTexture(gl.TEXTURE_2D, texture);
    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-   if(linear) {
+   if(linearFiltering) {
      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
    } else {
@@ -87,8 +89,4 @@ function draw_gl(nx, ny, pixels) {
    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, nx, ny, 0,
      gl.RGBA, gl.UNSIGNED_BYTE, pixels);
    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
-   if(flush){
-     gl.flush();
-   }
-
 }
