@@ -1,3 +1,5 @@
+//From: http://www.ibiblio.org/e-notes/webcl/mc/xy3d_gl.js
+
 function getShader ( gl, id ){
    var shaderScript = document.getElementById ( id );
    var str = "";
