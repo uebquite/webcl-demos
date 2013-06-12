@@ -95,20 +95,28 @@ __kernel void kPix(read_only image2d_t sB, read_only image2d_t sW,
 <script type="text/javascript">
 
 function loadKernel ( id ){
-   var shaderScript = document.getElementById ( id );
-   var str = "";
-   var k = shaderScript.firstChild;
-   while ( k ){
-     if ( k.nodeType == 3 ) str += k.textContent;
-     k = k.nextSibling;
-   }
-   return str;
+    var shaderScript = document.getElementById ( id );
+    var str = "";
+    var k = shaderScript.firstChild;
+
+    while (k){
+        if ( k.nodeType == 3 ) str += k.textContent;
+        k = k.nextSibling;
+    }
+
+    return str;
 }
 
 var T = .02, n = 512, n2 = n/2,  it = 100, bufSize = 4*n*n, ev,
-    ctx_c, frames = 0, animation = "animate", time, delay = 0;
+    ctx_c, frames = 0, animation = "animate", time, delay = 0, randByteLength = 4*n*n2;
+
 var kSpinB, kSpinW, kPix, cmdQueue, iSpinB, iSpinB1, iSpinW, iSpinW1,
-    bufPix, outBuffer, iTemp;
+    bufPix, outBuffer, iTemp, spin;
+
+var SPIN_GLOBAL_SIZE = new Int32Array([n, n2]);
+var PIX_GLOBAL_SIZE = new Int32Array([n, n]);
+var IMAGE_ORIGIN = new Int32Array([0, 0, 0]);
+var IMAGE_REGION = new Int32Array([n, n2, 1]);
 
 function CL_rand () {
   try {
@@ -121,7 +129,7 @@ function CL_rand () {
     var platforms = webcl.getPlatforms();
 
     if (!platforms) {
-        alert("No platform found in your system")
+        alert("No WebCL platform found in your system")
         return false;
     }
 
@@ -132,12 +140,14 @@ function CL_rand () {
         return false;
     }
 
-    var ctxProps = {platform: platforms[0], devices: [devices[0]],
+    var device = devices[0];
+
+    var ctxProps = {platform: platforms[0], devices: [device],
             deviceType: webcl.DEVICE_TYPE_GPU, shareGroup: 0, hint: null};
 
     var ctx = webcl.createContext(ctxProps);
 
-    bufRand = ctx.createBuffer (webcl.MEM_READ_WRITE, 4*n*n2);
+    bufRand = ctx.createBuffer (webcl.MEM_READ_WRITE,randByteLength);
     var format = {channelOrder:webcl.RGBA, channelDataType:webcl.FLOAT,
             width: n, height: n2, rowPitch: 0};
     iSpinB  = ctx.createImage(webcl.MEM_READ_WRITE, format);
@@ -151,12 +161,12 @@ function CL_rand () {
     var program = ctx.createProgram(kernelSrc);
 
     try {
-      program.build([devices[0]]);
+      program.build([device]);
     } catch(e) {
       alert ("Failed to build WebCL program. Error "
-        + program.getBuildInfo (devices[0],
+        + program.getBuildInfo (device,
            webcl.PROGRAM_BUILD_STATUS)
-        + ":  " + program.getBuildInfo (devices[0],
+        + ":  " + program.getBuildInfo (device,
            webcl.PROGRAM_BUILD_LOG));
       throw e;
     }
@@ -172,19 +182,16 @@ function CL_rand () {
     kPix = program.createKernel("kPix");
     kPix.setArg(2, bufPix);
 
-    var UIrand = new Uint32Array(4*n*n2);
-    for ( var i = 0; i < 4*n*n2;  i++ )
-      UIrand[i] = Math.floor(Math.random() * 4294967295);
-    var spin = new Float32Array(n*n2);
-    for ( var i = 0; i < n*n2;  i++ ) spin[i] = Math.random();
-    cmdQueue = ctx.createCommandQueue (devices[0], 0);
+    var UIrand = new Uint32Array(randByteLength);
+    for ( var i = 0; i <randByteLength;  i++ ) {
+        UIrand[i] = Math.floor(Math.random() * 4294967295);
+    }
 
-    cmdQueue.enqueueWriteImage(iSpinB, true, new Int32Array([0,0,0]), new Int32Array([n,n2,1]), 0, spin);
+    cmdQueue = ctx.createCommandQueue (device, 0);
 
-    for ( var i = 0; i < n*n2;  i++ ) spin[i] = Math.random();
-    cmdQueue.enqueueWriteImage(iSpinW, true, new Int32Array([0,0,0]), new Int32Array([n,n2,1]), 0   , spin);
-
-    cmdQueue.enqueueWriteBuffer(bufRand, true, 0, 4*n*n2, UIrand);
+    initImageSpin();
+    
+    cmdQueue.enqueueWriteBuffer(bufRand, true, 0,randByteLength, UIrand);
     outBuffer = new Uint8Array(bufSize);
   } catch(e) {
     document.getElementById("output").innerHTML
@@ -199,54 +206,61 @@ function CL_rand () {
   anim();
 }
 
+
+function randomSpin() {
+
+    /* Like a singleton */
+    if (!spin) {
+        spin = new Float32Array(n*n2);
+    }
+
+    for ( var i = 0; i < n*n2;  i++ ) {
+        spin[i] = Math.random();
+    }
+
+    return spin;
+}
+
 function draw(){
+
   for ( var i = 0; i < it;  i++ ){
     kSpinW.setArg(0, iSpinB);
     kSpinW.setArg(1, iSpinW);
     kSpinW.setArg(2, iSpinW1);
 
     try {
-        cmdQueue.enqueueNDRangeKernel(kSpinW, null, new Int32Array([n,n2]), new Int32Array([8,8]));
+        cmdQueue.enqueueNDRangeKernel(kSpinW, null, SPIN_GLOBAL_SIZE, null);
     } catch (e) {
         console.error(e);
         throw e;
     }
     cmdQueue.flush();
-    //var tmp = iSpinW1;  iSpinW1 = iSpinW;  iSpinW = tmp;
 
-    cmdQueue.enqueueCopyImage(iSpinW1, iTemp, new Int32Array([0, 0, 0]), new Int32Array([0, 0, 0]),
-            new Int32Array([n, n2, 1]));
-
-    cmdQueue.enqueueCopyImage(iSpinW, iSpinW1, new Int32Array([0, 0, 0]), new Int32Array([0, 0, 0]),
-            new Int32Array([n, n2, 1]));
-
-    cmdQueue.enqueueCopyImage(iTemp, iSpinW, new Int32Array([0, 0, 0]), new Int32Array([0, 0, 0]),
-            new Int32Array([n, n2, 1]));
+    /* Swap images */
+    cmdQueue.enqueueCopyImage(iSpinW1, iTemp,   IMAGE_ORIGIN, IMAGE_ORIGIN, IMAGE_REGION);
+    cmdQueue.enqueueCopyImage(iSpinW,  iSpinW1, IMAGE_ORIGIN, IMAGE_ORIGIN, IMAGE_REGION);
+    cmdQueue.enqueueCopyImage(iTemp,   iSpinW,  IMAGE_ORIGIN, IMAGE_ORIGIN, IMAGE_REGION);
 
     kSpinB.setArg(0, iSpinB);
     kSpinB.setArg(1, iSpinW);
     kSpinB.setArg(2, iSpinB1);
-    cmdQueue.enqueueNDRangeKernel(kSpinB, null, new Int32Array([n,n2]), new Int32Array([8,8]));
+
+    cmdQueue.enqueueNDRangeKernel(kSpinB, null, SPIN_GLOBAL_SIZE, null);
     cmdQueue.flush();
 
-    //tmp = iSpinB1;  iSpinB1 = iSpinB;  iSpinB = tmp;
-
-    cmdQueue.enqueueCopyImage(iSpinB1, iTemp, new Int32Array([0, 0, 0]), new Int32Array([0, 0, 0]),
-            new Int32Array([n, n2, 1]));
-
-    cmdQueue.enqueueCopyImage(iSpinB, iSpinB1, new Int32Array([0, 0, 0]), new Int32Array([0, 0, 0]),
-            new Int32Array([n, n2, 1]));
-
-    cmdQueue.enqueueCopyImage(iTemp, iSpinB, new Int32Array([0, 0, 0]), new Int32Array([0, 0, 0]),
-            new Int32Array([n, n2, 1]));
+    /* Swap images */
+    cmdQueue.enqueueCopyImage(iSpinB1, iTemp,   IMAGE_ORIGIN, IMAGE_ORIGIN, IMAGE_REGION);
+    cmdQueue.enqueueCopyImage(iSpinB,  iSpinB1, IMAGE_ORIGIN, IMAGE_ORIGIN, IMAGE_REGION);
+    cmdQueue.enqueueCopyImage(iTemp,   iSpinB,  IMAGE_ORIGIN, IMAGE_ORIGIN, IMAGE_REGION);
   }
 
   kPix.setArg(0, iSpinB);
   kPix.setArg(1, iSpinW);
 
-  cmdQueue.enqueueNDRangeKernel(kPix, null, new Int32Array([n,n]), null);
+  cmdQueue.enqueueNDRangeKernel(kPix, null, PIX_GLOBAL_SIZE, null);
   cmdQueue.enqueueReadBuffer (bufPix, true, 0, bufSize, outBuffer);
-  
+  cmdQueue.finish();
+
   try {
       draw_gl(n, n, outBuffer);
       frames++;
@@ -256,17 +270,19 @@ function draw(){
   }
 }
 
+/**
+ *  Used create random spins to init animation
+ */
+function initImageSpin() {
+    cmdQueue.enqueueWriteImage(iSpinB, true, IMAGE_ORIGIN, IMAGE_REGION, 0, randomSpin());
+    cmdQueue.enqueueWriteImage(iSpinW, true, IMAGE_ORIGIN, IMAGE_REGION, 0, randomSpin());
+}
+
 function anim(){
    draw();
    switch ( animation ){
      case "reset":
-      var spin = new Float32Array(n*n2);
-      for ( var i = 0; i < n*n2;  i++ ) spin[i] = Math.random();
-      cmdQueue.enqueueWriteImage(iSpinB, true, new Int32Array([0,0,0]), new Int32Array([n,n2,1]),
-              new Int32Array([0]), spin);
-      for ( var i = 0; i < n*n2;  i++ ) spin[i] = Math.random();
-      cmdQueue.enqueueWriteImage(iSpinW, true, new Int32Array([0,0,0]), new Int32Array([n,n2,1]),
-              new Int32Array([0]), spin);
+      initImageSpin();
       animation = "animate";
      case "animate":
        if (delay == 0) requestAnimationFrame(anim);
