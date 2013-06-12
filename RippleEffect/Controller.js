@@ -43,7 +43,7 @@ function Load()
 
 function UnLoad()
 {
-    if(isCLenabled) CloseCL();
+    if(isCLenabled) releaseBuffers();
 }
 
 function LoadComplete()
@@ -174,7 +174,7 @@ function RunFilter()
 function ShowResults()
 {
     var delta = Math.max(1, tEnd - tStart);
-    var fps = Math.floor(1000/delta);
+    var fps = Math.floor(1000 / delta);
 
     document.getElementById("msec").firstChild.nodeValue = fps + " fps"
     document.getElementById("msec").style.visibility = "visible";
