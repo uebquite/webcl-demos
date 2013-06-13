@@ -1,11 +1,11 @@
-DEMO              | Compare against pure JS  |   Uses WebGL  |    Uses WebCLGL interop  |
+DEMO              | Compare against pure JS  |   Uses WebGL  |    Uses WebCLGL interop  |   Works with GPU  | Works with CPU  |
 
-Barkley           |            No            |      Yes      |           No             |
-Fluid Dynamics    |            No            |      Yes      |           No             |
-Mandelbrot Expl.  |            No            |      Yes      |           No             |
-Path Integrals    |            No            |      Yes      |           Yes            |
-Small Path Tracing|            No            |      Yes      |           No             |
-Smoke Vision      |            No            |      Yes      |           No             |
-Sobel Filter      |            Yes           |      No       |           No             |
-XY Model          |            No            |      Yes      |           No             |
-3D XY Model       |            No            |      Yes      |           No             |
+Barkley           |            No            |      Yes      |           No             |        Yes        |      Yes        |
+Fluid Dynamics    |            No            |      Yes      |           No             |        Yes        |      No         |
+Mandelbrot Expl.  |            No            |      Yes      |           No             |        Yes        |      Yes        |
+Path Integrals    |            No            |      Yes      |           Yes            |        Yes        |      No         |
+Small Path Tracing|            No            |      Yes      |           No             |        Yes        |      No         |
+Smoke Vision      |            No            |      Yes      |           No             |        Yes        |      Yes        |
+Sobel Filter      |            Yes           |      No       |           No             |        Yes        |      Yes        |
+XY Model          |            No            |      Yes      |           No             |        Yes        |      Yes        |
+3D XY Model       |            No            |      Yes      |           No             |        Yes        |      Yes        |
