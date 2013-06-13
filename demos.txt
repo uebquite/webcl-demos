@@ -7,6 +7,7 @@ Path Integrals    |            No            |      Yes      |           Yes    
 Small Path Tracing|            No            |      Yes      |           No             |        Yes        |      No         |
 Smoke Vision      |            No            |      Yes      |           No             |        Yes        |      Yes        |
 Sobel Filter      |            Yes           |      No       |           No             |        Yes        |      Yes        |
+Video Cube        |            Yes           |      Yes      |           No             |        Yes        |      Yes        |
 XY Model          |            No            |      Yes      |           No             |        Yes        |      Yes        |
 3D XY Model       |            No            |      Yes      |           No             |        Yes        |      Yes        |
 Ripple Effect     |            Yes           |      No       |           No             |        Yes        |      Yes        |

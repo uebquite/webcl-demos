@@ -5,28 +5,28 @@
 
 <style type="text/css">
 body {
-   background:black;
-   padding:0;
-   margin:0;
-   font-weight: bold;
-   overflow:hidden;
+    background:black;
+    padding:0;
+    margin:0;
+    font-weight: bold;
+    overflow:hidden;
 }
 .info {
-   font-family: Arial, Helvetica, sans-serif;
-   font-weight: bold;
-   font-size:16px;
-   color: black;
-   text-align: right;
-   z-index: 1000;
+    font-family: Arial, Helvetica, sans-serif;
+    font-weight: bold;
+    font-size:16px;
+    color: black;
+    text-align: right;
+    z-index: 1000;
 }
 .btn {
-   font-family: Arial, Helvetica, sans-serif;
-   font-weight: bold;
-   font-size:16px;
-   color: black;
-   text-align:center;
-   height:30px;
-   z-index: 1000;
+    font-family: Arial, Helvetica, sans-serif;
+    font-weight: bold;
+    font-size:16px;
+    color: black;
+    text-align:center;
+    height:30px;
+    z-index: 1000;
 }
 </style>
 
@@ -79,95 +79,99 @@ body {
 </script>
 
 <script id="sobel_filter" type="x-kernel">
-   __kernel void sobel_filter(
-      __global float* input,
-      __global float* output,
-      const    uint    width,
-      const    uint    height)
-   {
-      uint x = get_global_id(0);
-      uint y = get_global_id(1);
+    __kernel void sobel_filter(
+    __global float* input,
+    __global float* output,
+    const    uint    width,
+    const    uint    height)
+    {
+        uint x = get_global_id(0);
+        uint y = get_global_id(1);
 
-      float Gx[4];
-      float Gy[4];
+        float Gx[4];
+        float Gy[4];
 
-      int c = (x*4) + (y * width * 4);
-      int k;
+        int c = (x*4) + (y * width * 4);
+        int k;
 
-      /* Read each texel component and calculate the filtered value using neighbouring texel components */
-      if( x >= 1 && x < (width-1) && y >= 1 && y < height - 1)
-      {
-         float i00[4];
-         float i10[4];
-         float i20[4];
-         float i01[4];
-         float i11[4];
-         float i21[4];
-         float i02[4];
-         float i12[4];
-         float i22[4];
-         for(k=0; k<4; k++) {
-            i00[k] = (float) input[(c - 4 - 4*width)+k];
-            i10[k] = (float) input[(c - 4*width)+k];
-            i20[k] = (float) input[(c + 4 - 4*width)+k];
-            i01[k] = (float) input[(c - 4)+k];
-            i11[k] = (float) input[c+k];
-            i21[k] = (float) input[(c + 4)+k];
-            i02[k] = (float) input[(c - 4 + 4*width)+k];
-            i12[k] = (float) input[(c + 4*width)+k];
-            i22[k] = (float) input[(c + 4 + 4*width)+k];
+        /* Read each texel component and calculate the filtered 
+        value using neighbouring texel components */
+        if( x >= 1 && x < (width-1) && y >= 1 && y < height - 1)
+        {
+            float i00[4];
+            float i10[4];
+            float i20[4];
+            float i01[4];
+            float i11[4];
+            float i21[4];
+            float i02[4];
+            float i12[4];
+            float i22[4];
+            for(k=0; k<4; k++) {
+                i00[k] = (float) input[(c - 4 - 4*width)+k];
+                i10[k] = (float) input[(c - 4*width)+k];
+                i20[k] = (float) input[(c + 4 - 4*width)+k];
+                i01[k] = (float) input[(c - 4)+k];
+                i11[k] = (float) input[c+k];
+                i21[k] = (float) input[(c + 4)+k];
+                i02[k] = (float) input[(c - 4 + 4*width)+k];
+                i12[k] = (float) input[(c + 4*width)+k];
+                i22[k] = (float) input[(c + 4 + 4*width)+k];
 
-            Gx[k] =   i00[k] + 2*i10[k] + i20[k] - i02[k]  - 2*i12[k] - i22[k];
+                Gx[k] = i00[k] + 2*i10[k] + i20[k] - i02[k] - 2*i12[k] - i22[k];
 
-            Gy[k] =   i00[k] - i20[k]  + 2*i01[k] - 2*i21[k] + i02[k]  -  i22[k];
+                Gy[k] = i00[k] - i20[k] + 2*i01[k] - 2*i21[k] + i02[k] - i22[k];
 
-            /* taking root of sums of squares of Gx and Gy */
-            output[c+k] = (float) (hypot(Gx[k], Gy[k]))/2;
-         }
-      }
-   }
+                /* taking root of sums of squares of Gx and Gy */
+                output[c+k] = (float) (hypot(Gx[k], Gy[k]))/2;
+            }
+        }
+    }
 </script>
 
 <script>
 
-   var WINW                = 800;          // drawing canvas width
-   var WINH                = 480;          // drawing canvas height
-   var SAMPLEPERIOD        = 10;           // calculate fps and sim/draw times over this many frames
-   var DISPLAYPERIOD       = 400;          // msecs between display updates of fps and sim/draw times
-   var ANGLE_DELTA         = 0.5;         // per cycle change to cube angle
+    var WINW                = 800;          // drawing canvas width
+    var WINH                = 480;          // drawing canvas height
+    var SAMPLEPERIOD        = 10;           // calculate fps and sim/draw times
+                                            // over this many frames
+    var DISPLAYPERIOD       = 400;          // msecs between display updates of
+                                            // fps and sim/draw times
+    var ANGLE_DELTA         = 0.5;          // per cycle change to cube angle
 
-   var   NO_FILTER         = 0;
-   var   JS_FILTER         = 1;
-   var   CL_FILTER         = 2;
-   var   NUM_FILTER_MODES  = CL_FILTER;
+    var NO_FILTER           = 0;
+    var JS_FILTER           = 1;
+    var CL_FILTER           = 2;
+    var NUM_FILTER_MODES    = CL_FILTER;
 
-   function UserData() {
-      this.gl              = null;
-      this.cl              = null;
+    var useGpu = true;
 
-      this.filterMode         = NO_FILTER;// toggle Sobel filter
-      this.video           = null;     // <video> element
-      this.videoCanvas     = null;     // <canvas> element for drawing video
-      this.videoContext    = null;     // context for drawing video
-      this.filterCanvas    = null;     // <canvas> element for filtered video
-      this.filterContext      = null;     // context for filtered video
-      this.glCanvas        = null;     // <canvas> for gl
-      this.videoTexture       = null;     // GL texture for video
-      this.filterTexture      = null;     // GL texture for filtered video
+    function UserData() {
+        this.gl              = null;
+        this.cl              = null;
 
-      this.fpsSampler      = null;     // FPS sampler
-      this.currentAngle       = 0;     // for rotating video cube
-   }
-   var userData = new UserData();
+        this.filterMode      = NO_FILTER;   // toggle Sobel filter
+        this.video           = null;        // <video> element
+        this.videoCanvas     = null;        // <canvas> element for drawing video
+        this.videoContext    = null;        // context for drawing video
+        this.filterCanvas    = null;        // <canvas> element for filtered video
+        this.filterContext   = null;        // context for filtered video
+        this.glCanvas        = null;        // <canvas> for gl
+        this.videoTexture    = null;        // GL texture for video
+        this.filterTexture   = null;        // GL texture for filtered video
 
-    function InitGL()
-    {
+        this.fpsSampler      = null;        // FPS sampler
+        this.currentAngle    = 0;           // for rotating video cube
+    }
+    var userData = new UserData();
+
+    function InitGL() {
         // Initialize
         var gl = initWebGL(
-            "glCanvas",                      // the id of the Canvas Element
-            "vshader", "fshader",               // the ids of the vertex and fragment shaders
-            [ "vNormal", "vColor", "vPosition"],   // shader attribute names in the order they appear
-            [ 1, 1, 1, 1 ], 10000);             // the clear color and depth values
+            "glCanvas",                           // the id of the Canvas Element
+            "vshader", "fshader",                 // the ids of the vertex and fragment shaders
+            [ "vNormal", "vColor", "vPosition"],  // shader attribute names in the order they appear
+            [ 1, 1, 1, 1 ], 10000);               // the clear color and depth values
 
         if(gl === null) return null;
 
@@ -184,7 +188,7 @@ body {
         gl.box = makeBox(gl);
 
 
-      // sg: create video texture
+        // sg: create video texture
         userData.videoTexture = gl.createTexture();
         userData.filterTexture = gl.createTexture();
 
@@ -228,11 +232,10 @@ body {
         return gl;
     }
 
-    function drawPicture(gl)
-    {
-      userData.fpsSampler.markFrame();
+    function drawPicture(gl) {
+        userData.fpsSampler.markFrame();
 
-      if(gl === null) return;
+        if(gl === null) return;
 
         // Clear the canvas
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -265,119 +268,150 @@ body {
             userData.currentAngle -= 360;
     }
 
-    // bugs:
-    //
-    // FF: video loop not supported https://bugzilla.mozilla.org/show_bug.cgi?id=449157
-    // Chrome: canvas texture not updated in Chrome 16
+    function updateTexture(gl) {
+        if(userData.filterMode === NO_FILTER) {
+            gl.bindTexture(gl.TEXTURE_2D, userData.videoTexture);
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA,
+                gl.UNSIGNED_BYTE, userData.video);
 
-   function updateTexture(gl)
-   {
-      if(userData.filterMode === NO_FILTER) {
-         // ref: http://people.mozilla.com/~prouget/demos/webglvideo/index.html
-         gl.bindTexture(gl.TEXTURE_2D, userData.videoTexture);
-         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, userData.video);
-         //gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, userData.video);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        }
 
-         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-      }
+        else if(userData.filterMode === JS_FILTER) {
+            // sg: copy <video> frame to <canvas>
+            userData.videoContext.drawImage(userData.video, 0, 0, 128, 128);
+            SobelJS(userData.videoCanvas, userData.filterCanvas,
+                userData.videoContext, userData.filterContext);
 
-      else if(userData.filterMode === JS_FILTER) {
-         // sg: copy <video> frame to <canvas>
-         userData.videoContext.drawImage(userData.video, 0, 0, 128, 128);
-         SobelJS(userData.videoCanvas, userData.filterCanvas, userData.videoContext, userData.filterContext);
+            gl.bindTexture(gl.TEXTURE_2D, userData.filterTexture);
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA,
+                gl.UNSIGNED_BYTE, userData.filterCanvas);
 
-         gl.bindTexture(gl.TEXTURE_2D, userData.filterTexture);
-         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, userData.filterCanvas);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        }
 
-         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-      }
+        else if(userData.filterMode === CL_FILTER && userData.cl !== null) {
+            // sg: copy <video> frame to <canvas>
+            userData.videoContext.drawImage(userData.video, 0, 0, 128, 128);
+            SobelCL(userData.cl, userData.videoCanvas, userData.filterCanvas,
+                userData.videoContext, userData.filterContext);
 
-      else if(userData.filterMode === CL_FILTER && userData.cl !== null) {
-         // sg: copy <video> frame to <canvas>
-         userData.videoContext.drawImage(userData.video, 0, 0, 128, 128);
-         SobelCL(userData.cl, userData.videoCanvas, userData.filterCanvas, userData.videoContext, userData.filterContext);
+            gl.bindTexture(gl.TEXTURE_2D, userData.filterTexture);
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB,
+                gl.UNSIGNED_BYTE, userData.filterCanvas);
 
-         gl.bindTexture(gl.TEXTURE_2D, userData.filterTexture);
-         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, userData.filterCanvas);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        }
+    }
 
-         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-      }
-   }
-
-    function start()
-    {
+    function start() {
         userData.gl = InitGL();
-        userData.cl = InitCL();
+        userData.cl = InitCL(useGpu);
 
-      userData.videoCanvas = document.getElementById("videoCanvas");
-      userData.videoContext = userData.videoCanvas.getContext("2d");
+        if(userData.gl === null) {
+            console.error("Error on InitGL");
+            return null;
+        }
 
-      userData.filterCanvas = document.getElementById("filterCanvas");
-      userData.filterContext = userData.filterCanvas.getContext("2d");
+        if(userData.cl === null) {
+            console.error("Error on InitCL");
+            return null;
+        }
+
+        userData.videoCanvas = document.getElementById("videoCanvas");
+        userData.videoContext = userData.videoCanvas.getContext("2d");
+
+
+        userData.filterCanvas = document.getElementById("filterCanvas");
+        userData.filterContext = userData.filterCanvas.getContext("2d");
 
         userData.video = document.getElementById("video");
         userData.video.volume = 0;
 
         userData.fpsSampler = new FpsSampler(SAMPLEPERIOD, "fps");
 
-      showFilterMode();
+        showFilterMode();
         setInterval(function() { drawPicture(userData.gl) }, 10);
         setInterval(function() { userData.fpsSampler.display(); }, DISPLAYPERIOD);
     }
 
-   function toggleFilterMode() {
-      userData.filterMode += 1;
-      if(userData.filterMode > NUM_FILTER_MODES)
-         userData.filterMode = NO_FILTER;
-      showFilterMode();
-   }
+    function toggleFilterMode() {
+        userData.filterMode += 1;
+        if(userData.filterMode > NUM_FILTER_MODES)
+            userData.filterMode = NO_FILTER;
+        showFilterMode();
+    }
 
-   function showFilterMode() {
-      var fm = document.getElementById("fm");
+    function showFilterMode() {
+        var fm = document.getElementById("fm");
+        var radioBtns = document.getElementById("deviceSwitch");
 
-      if(userData.filterMode === NO_FILTER)
-         fm.firstChild.nodeValue = "No Filter";
-      else if(userData.filterMode === JS_FILTER)
-         fm.firstChild.nodeValue = "Sobel JS";
-      else
-         fm.firstChild.nodeValue = "Sobel CL";
-   }
+        if(userData.filterMode === NO_FILTER) {
+            fm.firstChild.nodeValue = "No Filter";
+            radioBtns.style.visibility = "hidden";
+        }
+        else if(userData.filterMode === JS_FILTER) {
+            fm.firstChild.nodeValue = "JavaScript";
+            radioBtns.style.visibility = "hidden";
+        }
+        else {
+            fm.firstChild.nodeValue = "WebCL";
+            radioBtns.style.visibility = "visible";
+        }
+    }
+
+    function resetCube() {
+        userData.cl = null;
+        resetBuffersCL();
+        userData.cl = InitCL(useGpu);
+    }
+
 </script>
 </head>
 
 <body onload="start()">
 
 <div style="position:absolute; left:0px; top:0px">
-   <canvas id="glCanvas" style="position:absolute; left:0px; top:0px;" width="800" height="480"></canvas>
+    <canvas id="glCanvas" style="position:absolute; left:0px; top:0px;" width="800" height="480">
+    </canvas>
 
-   <div          class="info" style="position:absolute; left:  0px; top:15px; width:130px;">Frame Rate:</div>
-   <div id="fps" class="info" style="position:absolute; left:130px; top:15px; width: 80px;">XX</div>
+    <div class="info" style="position:absolute; left:  0px; top:15px; width:130px;">Frame Rate:</div>
+    <div id="fps" class="info" style="position:absolute; left:130px; top:15px; width: 80px;">XX</div>
 
-   <div          class="info" style="position:absolute; left:200px; top:15px; width:130px;">Filter Mode:</div>
-   <div id="fm"  class="info" style="position:absolute; left:330px; top:15px; width: 80px;">XX</div>
+    <div class="info" style="position:absolute; left:200px; top:15px; width:130px;">Filter Mode:</div>
+    <div id="fm"  class="info" style="position:absolute; left:330px; top:15px; width: 80px;">XX</div>
 
-   <div class="info" style="position:absolute; left: 10px; top:45px;">
-      <button id ="b1" type="button"  class="btn" style="width:200px;" onClick="toggleFilterMode()">Toggle Filter Mode</button>
-   </div>
+    <div class="info" style="position:absolute; left: 10px; top:45px;">
+        <button id ="b1" type="button"  class="btn" style="width:200px;"
+            onClick="toggleFilterMode()">Toggle Filter Mode</button>
+    </div>
+</div>
+
+<div style="visibility: hidden;" id="deviceSwitch">
+    <div style="position:absolute; left:430px; top:15px;"><input type="radio" name="r2" id="CPU" 
+        onclick="useGpu=false;resetCube()"></div>
+    <div style="position:absolute; left:450px; top:15px;" class="rad">CPU</div>
+    <div style="position:absolute; left:500px; top:15px;"><input type="radio" name="r2" id="GPU" 
+        onclick="useGpu=true;resetCube()" checked="true"></div>
+    <div style="position:absolute; left:520px; top:15px;" class="rad">GPU</div>
 </div>
 
 <div style="visibility:hidden">
-<!--<div style="position:absolute; left:400px; top:0px">-->
-   <video id="video" src="robots.ogv" autoplay loop></video>
-   <canvas id="videoCanvas" width="128" height="128"></canvas>
-   <canvas id="filterCanvas" width="128" height="128"></canvas>
+    <video id="video" src="robots.mp4" autoplay loop></video>
+    <canvas id="videoCanvas" width="128" height="128"></canvas>
+    <canvas id="filterCanvas" width="128" height="128"></canvas>
 </div>
 </body>
 </html>

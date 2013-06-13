@@ -4,8 +4,6 @@ function getKernel (id ) {
     if(kernelScript === null || kernelScript.type !== "x-kernel")
         return null;
 
-    //if(kernelScript.text !== null) return kernelScript.text; // old IE
-
     return kernelScript.firstChild.textContent;
 }
 
@@ -29,236 +27,190 @@ var outputBuffer = null;                    // OpenCL buffer
 var inputData = null;                       // Float32Array
 var outputData = null;                      // Float32Array
 
-var globalThreads = null;
-var ocalThreads = null;
+var globalWorkSize = null;
+var localWorkSize = null;
+var types = WebCLKernelArgumentTypes;
 
 
-function InitCL()
+function InitCL(useGpu)
 {
-    if(typeof(WebCLComputeContext) === "undefined")
-    {
-        console.error("WebCLComputeContext is yet to be defined");
-        return null;
-    }
-    
-    cl = new WebCLComputeContext();
+    try {
+        cl = webcl;
 
-    if(cl === null)
-    {
-        console.error("Failed to create WebCL context");
-        return null;
-    }
+        if(cl === undefined) {
+            console.error("Unfortunately your system does not support WebCL");
+            return null;
+        }
 
-    // Select a compute device
-    //
-    platform_ids = cl.getPlatformIDs();
-    if (cl.getError() !== cl.SUCCESS)
-    {
-        console.error("Failed to get platform IDs");
-        return null;
-    }
-    if(platform_ids.length === 0)
-    {
-        console.error("No platforms available");
-        return null;
-    }
-    platform_id = platform_ids[0];
+        // Select a compute device
+        //
+        platform_ids = cl.getPlatforms();
+        if(platform_ids.length === 0) {
+            console.error("No platforms available");
+            return null;
+        }
 
-    // Select a compute device
-    //
-    var gpu = true;
-    device_ids = cl.getDeviceIDs(platform_id, gpu ? cl.DEVICE_TYPE_GPU : cl.DEVICE_TYPE_CPU);
-    if (cl.getError() !== cl.SUCCESS)
-    {
-        console.error("Failed to get device IDs");
-        return null;
-    }
-    if(device_ids.length === 0)
-    {
-        console.error("No devices available");
-        return null;
-    }
-    device_id = device_ids[0];
+        platform_id = platform_ids[0];
 
-    // Create a compute context
-    //
-    context = cl.createContext(null, device_id, null, null);
-    if (cl.getError() !== cl.SUCCESS)
-    {
-        console.error("Failed to create a compute context");
-        return null;
-    }
+        // Select a compute device
+        //
 
-    // Create a command queue
-    //
-    queue = cl.createCommandQueue(context, device_id, null);
-    if (cl.getError() !== cl.SUCCESS)
-    {
-        console.error("Failed to create a command queue");
-        return;
-    }
+        device_ids = platform_id.getDevices(useGpu ? cl.DEVICE_TYPE_GPU : cl.DEVICE_TYPE_CPU);
+        if(device_ids.length === 0) {
+            console.error("No devices available");
+            return null;
+        }
 
-    // Create the compute program from the source buffer
-    //
-    var kernelSource = getKernel("sobel_filter");
-    if (kernelSource === null)
-    {
-        console.error("No kernel named: " + "sobel_filter");
-        return null;
-    }
+        device_id = device_ids[0];
 
-    program = cl.createProgramWithSource(context, kernelSource);
-    if (cl.getError() !== cl.SUCCESS)
-    {
-        console.error("Failed to create compute program");
-        return null;
-    }
+        // Create a compute context
+        //
+        var contextProperties = {platform: platform_id, devices: [device_id],
+                                deviceType: cl.DEVICE_TYPE_ALL, shareGroup: 0, hint: null};
+        context = cl.createContext(contextProperties);
 
-    // Build the program executable
-    //
-    err = cl.buildProgram(program, null, null, null);
-    if (err !== cl.SUCCESS)
-    {
-        console.error("Failed to build program executable");
-        var info = cl.getProgramBuildInfo(program, device_id, cl.PROGRAM_BUILD_LOG);
-        console.log(info);
-        return null;
-    }
+        // Create a command queue
+        //
+        queue = context.createCommandQueue(device_id);
 
-    // Create the compute kernel in the program we wish to run
-    //
-    kernel = cl.createKernel(program, "sobel_filter");
-    if (cl.getError() !== cl.SUCCESS)
-    {
-        console.error("Failed to create compute kernel");
-        return null;
+        // Create the compute program from the source buffer
+        //
+        var kernelSource = getKernel("sobel_filter");
+        if (kernelSource === null) {
+            console.error("No kernel named: " + "sobel_filter");
+            return null;
+        }
+
+        program = context.createProgram(kernelSource);
+
+        // Build the program executable
+        //
+        try {
+            program.build(device_id);
+        } catch(e) {
+            console.error("Failed to build WebCL program. Error " +
+            program.getBuildInfo(device_id,cl.PROGRAM_BUILD_STATUS) +
+            + ":  "
+            + program.getBuildInfo(device_id,cl.PROGRAM_BUILD_LOG));
+            throw e;
+        }
+
+        // Create the compute kernel in the program we wish to run
+        //
+        kernel = program.createKernel("sobel_filter");
+
+        return cl;
+
+    } catch (e) {
+        console.error("Error on InitWebCL = " + e.message);
+        throw e;
     }
-    
-    return cl;
 }
 
 function SobelCL(cl, inputCanvas, outputCanvas, inputContext, outputContext)
 {
-    // Image has loaded so create OpenCL memory objects
-    //
-    var imageData = inputContext.getImageData(0, 0, inputCanvas.width, inputCanvas.height);
-    var nPixels = imageData.data.length;
-    
-    if(inputData === null)
-    {
-        inputData = new Float32Array(nPixels);
-    }
-    for (var i=0; i < nPixels; i++) {
-        inputData[i] = imageData.data[i];
-    }
-    
-    if(inputBuffer === null)
-    {
-        inputBuffer = cl.createBuffer(context, cl.MEM_READ_ONLY, Float32Array.BYTES_PER_ELEMENT * nPixels, null);
-    }
-    
-    if(outputBuffer === null)
-    {
-        outputBuffer = cl.createBuffer(context, cl.MEM_WRITE_ONLY, Float32Array.BYTES_PER_ELEMENT * nPixels, null);
-    }
-
-    if(inputBuffer === null || outputBuffer === null)
-    {
-        console.error("Failed to create buffers");
-        return;
-    }
-
-    // Write our image into the input array in device memory
-    //
-    cl.enqueueWriteBuffer(queue, inputBuffer, true, 0, Float32Array.BYTES_PER_ELEMENT * nPixels, inputData, null);
-    if (cl.getError() !== cl.SUCCESS)
-    {
-        console.error("Failed to write to source image");
-        return;
-    }
-
-    var w = inputCanvas.width;
-    var h = inputCanvas.height;
-
-    // Set the arguments to our compute kernel
-    //
-    err = 0;
-    err  |= cl.setKernelArg(kernel, 0, inputBuffer);
-    err  |= cl.setKernelArg(kernel, 1, outputBuffer);
-    err  |= cl.setKernelArg(kernel, 2, w);
-    err  |= cl.setKernelArg(kernel, 3, h);
-    if (err !== cl.SUCCESS)
-    {
-        console.error("Failed to set kernel arguments");
-        return;
-    }
-    
-    if(globalThreads === null || localThreads == null)
-    {
-        // Get the maximum work group size for executing the kernel on the device
+    try {
+        // Image has loaded so create OpenCL memory objects
         //
-        var workGroupSize = cl.getKernelWorkGroupInfo(kernel, device_id, cl.KERNEL_WORK_GROUP_SIZE);
-        if (cl.getError() !== cl.SUCCESS)
-        {
-            console.error("Failed to retrieve kernel work group info");
+        var imageData = inputContext.getImageData(0, 0, inputCanvas.width, inputCanvas.height);
+        var nPixels = imageData.data.length;
+
+        if(inputData === null) {
+            inputData = new Float32Array(nPixels);
+        }
+        for (var i=0; i < nPixels; i++) {
+            inputData[i] = imageData.data[i];
+        }
+
+        if(inputBuffer === null) {
+            inputBuffer = context.createBuffer(cl.MEM_READ_ONLY,
+                Float32Array.BYTES_PER_ELEMENT * nPixels);
+        }
+
+        if(outputBuffer === null) {
+            outputBuffer = context.createBuffer(cl.MEM_WRITE_ONLY,
+                Float32Array.BYTES_PER_ELEMENT * nPixels);
+        }
+
+        if(inputBuffer === null || outputBuffer === null) {
+            console.error("Failed to create buffers");
             return;
         }
-        if(workGroupSize < inputCanvas.width) {
-            console.error("Max work group size is too small: " + workGroupSize);
-            return;
-        }
-    
-        // Execute the kernel over the entire range of our 2d input data set
-        // using the maximum number of work group items for this device
+
+        // Write our image into the input array in device memory
         //
-        blockSizeX = inputCanvas.width;
-        blockSizeY = 1;
-        if(blockSizeX * blockSizeY > workGroupSize)
-        {
-            console.error("Block sizes are too big");
-            return;
+        queue.enqueueWriteBuffer(inputBuffer, true, 0,
+            Float32Array.BYTES_PER_ELEMENT * nPixels, inputData);
+
+
+        var w = inputCanvas.width;
+        var h = inputCanvas.height;
+
+        // Set the arguments to our compute kernel
+        //
+        kernel.setArg(0, inputBuffer);
+        kernel.setArg(1, outputBuffer);
+        kernel.setArg(2, w, types.UINT);
+        kernel.setArg(3, h, types.UINT);
+
+        if(globalWorkSize === null || localWorkSize == null) {
+            // Get the maximum work group size for executing the kernel on the device
+            //
+            var workGroupSize = kernel.getWorkGroupInfo(device_id, cl.KERNEL_WORK_GROUP_SIZE);
+            if(workGroupSize < inputCanvas.width) {
+                console.error("Max work group size is too small: " + workGroupSize);
+                return;
+            }
+
+            // Execute the kernel over the entire range of our 2d input data set
+            // using the maximum number of work group items for this device
+            //
+            blockSizeX = inputCanvas.width;
+            blockSizeY = 1;
+            if(blockSizeX * blockSizeY > workGroupSize) {
+                console.error("Block sizes are too big");
+                return;
+            }
+
+            globalWorkSize = new Int32Array([w, h]);
+            localWorkSize = new Int32Array([blockSizeX, blockSizeY]);
         }
-        
-        globalThreads = [w, h];
-        localThreads = [blockSizeX, blockSizeY];
+
+        queue.enqueueNDRangeKernel(kernel, 0, globalWorkSize, localWorkSize);
+
+        // Wait for the command queue to get serviced before reading back results
+        //
+        queue.finish();
+
+        imageData = outputContext.getImageData(0, 0, outputCanvas.width, outputCanvas.height);
+        nPixels = imageData.data.length;
+
+        if(outputData === null) {
+            outputData = new Float32Array(nPixels);
+        }
+
+        // Read back the results from the device to verify the output
+        //
+
+        queue.enqueueReadBuffer(outputBuffer, true, 0,
+            Float32Array.BYTES_PER_ELEMENT * nPixels, outputData);
+        queue.finish();
+
+        for (var i = 0; i < nPixels; i+=4) {
+            imageData.data[i] = outputData[i];
+            imageData.data[i+1] = outputData[i+1];
+            imageData.data[i+2] = outputData[i+2];
+            imageData.data[i+3] = 255;
+        }
+
+        outputContext.putImageData(imageData, 0, 0);
+    } catch(e) {
+        console.error("Error on SobelCL = " + e.message);
+        throw e;
     }
-    
-    cl.enqueueNDRangeKernel(queue, kernel, 2, 0, new Int32Array(globalThreads), new Int32Array(localThreads), null);
-    if (cl.getError() !== cl.SUCCESS)
-    {
-        console.error("Failed to execute kernel");
-        return;
-    }
+}
 
-    // Wait for the command queue to get serviced before reading back results
-    //
-    //cl.finish(queue, null, GetResults);
-    cl.finish(queue, null, null);
-
-    imageData = outputContext.getImageData(0, 0, outputCanvas.width, outputCanvas.height);
-    nPixels = imageData.data.length;
-    
-    if(outputData === null)
-    {
-        outputData = new Float32Array(nPixels);
-    }
-
-    // Read back the results from the device to verify the output
-    //
-    cl.enqueueReadBuffer(queue, outputBuffer, true, 0, Float32Array.BYTES_PER_ELEMENT * nPixels, outputData, null);
-
-    if (err !== cl.SUCCESS)
-    {
-        console.error("Failed to read output array");
-        return;
-    }
-
-    for (var i = 0; i < nPixels; i+=4) {
-        imageData.data[i] = outputData[i];
-        imageData.data[i+1] = outputData[i+1];
-        imageData.data[i+2] = outputData[i+2];
-        imageData.data[i+3] = 255;
-    }
-
-    outputContext.putImageData(imageData, 0, 0);
+function resetBuffersCL() {
+    inputBuffer = null;
+    outputBuffer = null;
 }
