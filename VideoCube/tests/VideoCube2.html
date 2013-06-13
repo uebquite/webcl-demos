@@ -1,0 +1,381 @@
+
+<html>
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>WebGL Video Cube</title>
+
+<style type="text/css">
+body {
+   background:black;
+   padding:0;
+   margin:0;
+   font-weight: bold;
+   overflow:hidden;
+}
+.info {
+   font-family: Arial, Helvetica, sans-serif;
+   font-weight: bold;
+   font-size:16px;
+   color: black;
+   text-align: right;
+   z-index: 1000;
+}
+.btn {
+   font-family: Arial, Helvetica, sans-serif;
+   font-weight: bold;
+   font-size:16px;
+   color: black;
+   text-align:center;
+   height:30px;
+   z-index: 1000;
+}
+</style>
+
+<script src="sampler.js"></script>
+<script src="J3DI.js"> </script>
+<script src="J3DIMath.js"> </script>
+<script src="sobelJS.js"> </script>
+<script src="sobelCL.js"> </script>
+
+<script id="vshader" type="x-shader/x-vertex">
+#ifdef GL_ES
+    precision mediump float;
+#endif
+    uniform mat4 u_modelViewProjMatrix;
+    uniform mat4 u_normalMatrix;
+    uniform vec3 lightDir;
+
+    attribute vec3 vNormal;
+    attribute vec4 vTexCoord;
+    attribute vec4 vPosition;
+
+    varying float v_Dot;
+    varying vec2 v_texCoord;
+
+    void main()
+    {
+        gl_Position = u_modelViewProjMatrix * vPosition;
+        v_texCoord = vTexCoord.st;
+        vec4 transNormal = u_normalMatrix * vec4(vNormal, 1);
+        v_Dot = max(dot(transNormal.xyz, lightDir), 0.0);
+    }
+</script>
+
+<script id="fshader" type="x-shader/x-fragment">
+#ifdef GL_ES
+    precision mediump float;
+#endif
+    uniform sampler2D sampler2d;
+
+    varying float v_Dot;
+    varying vec2 v_texCoord;
+
+    void main()
+    {
+        vec2 texCoord = vec2(v_texCoord.s, v_texCoord.t);
+        vec4 color = texture2D(sampler2d, texCoord);
+        color += vec4(0.1, 0.1, 0.1, 1);
+        gl_FragColor = vec4(color.xyz * v_Dot, color.a);
+    }
+</script>
+
+<script id="sobel_filter" type="x-kernel">
+   __kernel void sobel_filter(
+      __global float* input,
+      __global float* output,
+      const    uint    width,
+      const    uint    height)
+   {
+      uint x = get_global_id(0);
+      uint y = get_global_id(1);
+
+      float Gx[4];
+      float Gy[4];
+
+      int c = (x*4) + (y * width * 4);
+      int k;
+
+      /* Read each texel component and calculate the filtered value using neighbouring texel components */
+      if( x >= 1 && x < (width-1) && y >= 1 && y < height - 1)
+      {
+         float i00[4];
+         float i10[4];
+         float i20[4];
+         float i01[4];
+         float i11[4];
+         float i21[4];
+         float i02[4];
+         float i12[4];
+         float i22[4];
+         for(k=0; k<4; k++) {
+            i00[k] = (float) input[(c - 4 - 4*width)+k];
+            i10[k] = (float) input[(c - 4*width)+k];
+            i20[k] = (float) input[(c + 4 - 4*width)+k];
+            i01[k] = (float) input[(c - 4)+k];
+            i11[k] = (float) input[c+k];
+            i21[k] = (float) input[(c + 4)+k];
+            i02[k] = (float) input[(c - 4 + 4*width)+k];
+            i12[k] = (float) input[(c + 4*width)+k];
+            i22[k] = (float) input[(c + 4 + 4*width)+k];
+
+            Gx[k] =   i00[k] + 2*i10[k] + i20[k] - i02[k]  - 2*i12[k] - i22[k];
+
+            Gy[k] =   i00[k] - i20[k]  + 2*i01[k] - 2*i21[k] + i02[k]  -  i22[k];
+
+            /* taking root of sums of squares of Gx and Gy */
+            output[c+k] = (float) (hypot(Gx[k], Gy[k]))/2;
+         }
+      }
+   }
+</script>
+
+<script>
+
+   var WINW                = 800;          // drawing canvas width
+   var WINH                = 480;          // drawing canvas height
+   var SAMPLEPERIOD        = 10;           // calculate fps and sim/draw times over this many frames
+   var DISPLAYPERIOD       = 400;          // msecs between display updates of fps and sim/draw times
+   var ANGLE_DELTA         = 0.5;         // per cycle change to cube angle
+
+   var   NO_FILTER         = 0;
+   var   JS_FILTER         = 1;
+   var   CL_FILTER         = 2;
+   var   NUM_FILTER_MODES  = CL_FILTER;
+
+   function UserData() {
+      this.gl              = null;
+      this.cl              = null;
+
+      this.filterMode         = NO_FILTER;// toggle Sobel filter
+      this.video           = null;     // <video> element
+      this.videoCanvas     = null;     // <canvas> element for drawing video
+      this.videoContext    = null;     // context for drawing video
+      this.filterCanvas    = null;     // <canvas> element for filtered video
+      this.filterContext      = null;     // context for filtered video
+      this.glCanvas        = null;     // <canvas> for gl
+      this.videoTexture       = null;     // GL texture for video
+      this.filterTexture      = null;     // GL texture for filtered video
+
+      this.fpsSampler      = null;     // FPS sampler
+      this.currentAngle       = 0;     // for rotating video cube
+   }
+   var userData = new UserData();
+
+    function InitGL()
+    {
+        // Initialize
+        var gl = initWebGL(
+            "glCanvas",                      // the id of the Canvas Element
+            "vshader", "fshader",               // the ids of the vertex and fragment shaders
+            [ "vNormal", "vColor", "vPosition"],   // shader attribute names in the order they appear
+            [ 1, 1, 1, 1 ], 10000);             // the clear color and depth values
+
+        if(gl === null) return null;
+
+        // Set some uniform variables for the shaders
+        gl.uniform3f(gl.getUniformLocation(gl.program, "lightDir"), 0, 0, 1);
+        gl.uniform1i(gl.getUniformLocation(gl.program, "sampler2d"), 0);
+
+        // Enable texturing
+        gl.enable(gl.TEXTURE_2D);
+
+        // Create a box. On return 'gl' contains a 'box' property with
+        // the BufferObjects containing the arrays for vertices,
+        // normals, texture coords, and indices.
+        gl.box = makeBox(gl);
+
+
+      // sg: create video texture
+        userData.videoTexture = gl.createTexture();
+        userData.filterTexture = gl.createTexture();
+
+        // Create some matrices to use later and save their locations in the shaders
+        gl.mvMatrix = new J3DIMatrix4();
+        gl.u_normalMatrixLoc = gl.getUniformLocation(gl.program, "u_normalMatrix");
+        gl.normalMatrix = new J3DIMatrix4();
+        gl.u_modelViewProjMatrixLoc = gl.getUniformLocation(gl.program, "u_modelViewProjMatrix");
+        gl.mvpMatrix = new J3DIMatrix4();
+
+        // Enable all of the vertex attribute arrays.
+        gl.enableVertexAttribArray(0);
+        gl.enableVertexAttribArray(1);
+        gl.enableVertexAttribArray(2);
+
+        // Set up all the vertex attributes for vertices, normals and texCoords
+        gl.bindBuffer(gl.ARRAY_BUFFER, gl.box.vertexObject);
+        gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, gl.box.normalObject);
+        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, gl.box.texCoordObject);
+        gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 0, 0);
+
+        // Bind the index array
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.box.indexObject);
+
+
+        userData.glCanvas = document.getElementById('glCanvas');
+
+        var myWidth = userData.glCanvas.width;
+        var myHeight = userData.glCanvas.height;
+
+        // Set the viewport and projection matrix for the scene
+        gl.viewport(0, 0, myWidth, myHeight);
+        gl.perspectiveMatrix = new J3DIMatrix4();
+        gl.perspectiveMatrix.perspective(30, myWidth/myHeight, 1, 10000);
+        gl.perspectiveMatrix.lookat(0, 0, 7, 0, 0, 0, 0, 1, 0);
+
+        return gl;
+    }
+
+    function drawPicture(gl)
+    {
+      userData.fpsSampler.markFrame();
+
+      if(gl === null) return;
+
+        // Clear the canvas
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        // Make a model/view matrix.
+        gl.mvMatrix.makeIdentity();
+        gl.mvMatrix.rotate(20, 1,0,0);
+        gl.mvMatrix.rotate(userData.currentAngle, 0,1,0);
+
+        // Construct the normal matrix from the model-view matrix and pass it in
+        gl.normalMatrix.load(gl.mvMatrix);
+        gl.normalMatrix.invert();
+        gl.normalMatrix.transpose();
+        gl.normalMatrix.setUniform(gl, gl.u_normalMatrixLoc, false);
+
+        // Construct the model-view * projection matrix and pass it in
+        gl.mvpMatrix.load(gl.perspectiveMatrix);
+        gl.mvpMatrix.multiply(gl.mvMatrix);
+        gl.mvpMatrix.setUniform(gl, gl.u_modelViewProjMatrixLoc, false);
+
+        updateTexture(gl);
+
+        // Draw the cube
+        gl.drawElements(gl.TRIANGLES, gl.box.numIndices, gl.UNSIGNED_BYTE, 0);
+
+        gl.flush();
+
+        userData.currentAngle += ANGLE_DELTA;
+        if (userData.currentAngle > 360)
+            userData.currentAngle -= 360;
+    }
+
+
+   function updateTexture(gl)
+   {
+      if(userData.filterMode === NO_FILTER) {
+         // ref: http://people.mozilla.com/~prouget/demos/webglvideo/index.html
+         gl.bindTexture(gl.TEXTURE_2D, userData.videoTexture);
+         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, userData.video);
+         //gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, userData.video);
+
+         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      }
+
+      // canvas texture not updated in Chrome 16, ok in FF 7
+
+      else if(userData.filterMode === JS_FILTER) {
+         // sg: copy <video> frame to <canvas>
+         userData.videoContext.drawImage(userData.video, 0, 0, 128, 128);
+         SobelJS(userData.videoCanvas, userData.filterCanvas, userData.videoContext, userData.filterContext);
+
+         gl.bindTexture(gl.TEXTURE_2D, userData.filterTexture);
+         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, userData.filterCanvas);
+
+         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      }
+
+      else if(userData.filterMode === CL_FILTER && userData.cl !== null) {
+         // sg: copy <video> frame to <canvas>
+         userData.videoContext.drawImage(userData.video, 0, 0, 128, 128);
+         SobelCL(userData.cl, userData.videoCanvas, userData.filterCanvas, userData.videoContext, userData.filterContext);
+
+         gl.bindTexture(gl.TEXTURE_2D, userData.filterTexture);
+         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, userData.filterCanvas);
+
+         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      }
+   }
+
+    function start()
+    {
+        userData.gl = InitGL();
+        userData.cl = InitCL();
+
+      userData.videoCanvas = document.getElementById("videoCanvas");
+      userData.videoContext = userData.videoCanvas.getContext("2d");
+
+      userData.filterCanvas = document.getElementById("filterCanvas");
+      userData.filterContext = userData.filterCanvas.getContext("2d");
+
+        userData.video = document.getElementById("video");
+        userData.video.volume = 0;
+
+        userData.fpsSampler = new FpsSampler(SAMPLEPERIOD, "fps");
+
+      showFilterMode();
+        setInterval(function() { drawPicture(userData.gl) }, 10);
+        setInterval(function() { userData.fpsSampler.display(); }, DISPLAYPERIOD);
+    }
+
+   function toggleFilterMode() {
+      userData.filterMode += 1;
+      if(userData.filterMode > NUM_FILTER_MODES)
+         userData.filterMode = NO_FILTER;
+      showFilterMode();
+   }
+
+   function showFilterMode() {
+      var fm = document.getElementById("fm");
+
+      if(userData.filterMode === NO_FILTER)
+         fm.firstChild.nodeValue = "No Filter";
+      else if(userData.filterMode === JS_FILTER)
+         fm.firstChild.nodeValue = "Sobel JS";
+      else
+         fm.firstChild.nodeValue = "Sobel CL";
+   }
+</script>
+</head>
+
+<body onload="start()">
+
+<div style="position:absolute; left:0px; top:0px">
+   <canvas id="glCanvas" style="position:absolute; left:0px; top:0px;" width="800" height="480"></canvas>
+
+   <div          class="info" style="position:absolute; left:  0px; top:15px; width:130px;">Frame Rate:</div>
+   <div id="fps" class="info" style="position:absolute; left:130px; top:15px; width: 80px;">XX</div>
+
+   <div          class="info" style="position:absolute; left:200px; top:15px; width:130px;">Filter Mode:</div>
+   <div id="fm"  class="info" style="position:absolute; left:330px; top:15px; width: 80px;">XX</div>
+
+   <div class="info" style="position:absolute; left: 10px; top:45px;">
+      <button id ="b1" type="button"  class="btn" style="width:200px;" onClick="toggleFilterMode()">Toggle Filter Mode</button>
+   </div>
+</div>
+
+<div style="visibility:hidden">
+<!--<div style="position:absolute; left:400px; top:0px">-->
+   <video id="video" src="robots.ogv" autoplay loop></video>
+   <canvas id="videoCanvas" width="128" height="128"></canvas>
+   <canvas id="filterCanvas" width="128" height="128"></canvas>
+</div>
+</body>
+</html>
