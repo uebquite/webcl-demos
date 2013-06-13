@@ -6,5 +6,6 @@ Mandelbrot Expl.  |            No            |      Yes      |           No     
 Path Integrals    |            No            |      Yes      |           Yes            |
 Small Path Tracing|            No            |      Yes      |           No             |
 Smoke Vision      |            No            |      Yes      |           No             |
+Sobel Filter      |            Yes           |      No       |           No             |
 XY Model          |            No            |      Yes      |           No             |
 3D XY Model       |            No            |      Yes      |           No             |
