@@ -1,4 +1,3 @@
-
 var jsInputImage;                           // JavaScript image
 var width;
 var height;
@@ -20,34 +19,32 @@ var cy = 0;
 var diag = 0;
 var touchDown = false;
 
-window.requestAnimFrame = (function(){
+window.requestAnimFrame = (function () {
           return  window.requestAnimationFrame       ||
                   window.webkitRequestAnimationFrame ||
                   window.mozRequestAnimationFrame    ||
                   window.oRequestAnimationFrame      ||
                   window.msRequestAnimationFrame     ||
                   function(/* function */ callback, /* DOMElement */ element){
-                    window.setTimeout(callback, 1000 / 60);
+                      window.setTimeout(callback, 1000 / 60);
                   };
     })();
 
 
-function Load()
-{
+function init() {
     // Start load of an image from a file
     //
     jsInputImage = new Image();
     jsInputImage.src = "pebble.jpg";
-    jsInputImage.onload = LoadComplete;
+    jsInputImage.onload = loadComplete;
 }
 
-function UnLoad()
-{
-    if(isCLenabled) releaseBuffers();
+function release() {
+    if (isCLenabled)
+        releaseBuffers();
 }
 
-function LoadComplete()
-{
+function loadComplete() {
     width = jsInputImage.width;
     height = jsInputImage.height;
 
@@ -69,31 +66,31 @@ function LoadComplete()
     window.scrollTo(0, 1);
 
     // attempt to prevent scrolling
-    outputCanvas.addEventListener("touchstart", function(e) { e.preventDefault(); }, false);
-    outputCanvas.addEventListener("touchend",   function(e) { e.preventDefault(); }, false);
-    outputCanvas.addEventListener("touchmove",  function(e) { e.preventDefault(); }, false);
+    outputCanvas.addEventListener("touchstart", function (e) { e.preventDefault(); }, false);
+    outputCanvas.addEventListener("touchend",   function (e) { e.preventDefault(); }, false);
+    outputCanvas.addEventListener("touchmove",  function (e) { e.preventDefault(); }, false);
 
     // handle change of center
-    outputCanvas.addEventListener("mousedown", function(e) { touchDown = true;  }, false);
-    outputCanvas.addEventListener("mouseup",   function(e) { touchDown = false; }, false);
-    outputCanvas.addEventListener("mousemove", OnMouseMove, false);
-    outputCanvas.addEventListener("touchstart", function(e) { touchDown = true;  }, false);
-    outputCanvas.addEventListener("touchend",   function(e) { touchDown = false; }, false);
-    outputCanvas.addEventListener("touchmove",  OnTouchMove, false);
+    outputCanvas.addEventListener("mousedown", function (e) { touchDown = true;  }, false);
+    outputCanvas.addEventListener("mouseup",   function (e) { touchDown = false; }, false);
+    outputCanvas.addEventListener("mousemove", onMouseMove, false);
+    outputCanvas.addEventListener("touchstart", function (e) { touchDown = true;  }, false);
+    outputCanvas.addEventListener("touchend",   function (e) { touchDown = false; }, false);
+    outputCanvas.addEventListener("touchmove",  onTouchMove, false);
 
-    var b1 = new FastButton(document.getElementById("run"),    ToggleRunning);
-    var b2 = new FastButton(document.getElementById("filter"), ToggleFilter);
+    var b1 = new FastButton(document.getElementById("run"),    toggleRunning);
+    var b2 = new FastButton(document.getElementById("filter"), toggleFilter);
 
     isRunning = false;
-    isCLenabled = InitCL();
+    isCLenabled = initCL();
     useJS = !isCLenabled;
 
-    ShowRunState();
-    ShowFilterState();
-    HideResults();
+    showRunState();
+    showFilterState();
+    hideResults();
 }
 
-function OnMouseMove (e) {
+function onMouseMove (e) {
     if (touchDown) {
         var nx = Math.floor(e.offsetX);
         var ny = Math.floor(e.offsetY);
@@ -104,7 +101,7 @@ function OnMouseMove (e) {
     }
 }
 
-function OnTouchMove (e) {
+function onTouchMove (e) {
     if (touchDown  && e.targetTouches.length === 1) {
         var touch = e.targetTouches[0];
         var nx = touch.clientX;
@@ -116,63 +113,55 @@ function OnTouchMove (e) {
     }
 }
 
-function ToggleRunning()
-{
+function toggleRunning() {
     isRunning = !isRunning;
-    ShowRunState();
+    showRunState();
 
     if (isRunning) {
-        requestAnimFrame(RunFilter);
-    }
-    else {
-        HideResults();
+        requestAnimFrame(runFilter);
+    } else {
+        hideResults();
     }
 }
 
-function ShowRunState()
-{
+function showRunState() {
     document.getElementById("run").firstChild.nodeValue = isRunning ? "Press to Stop" : "Press to Start";
 }
 
-function ToggleFilter()
-{
+function toggleFilter() {
     if (!isCLenabled)
         return;
 
     useJS = !useJS;
-    ShowFilterState();
+    showFilterState();
 }
 
-function ShowFilterState()
-{
+function showFilterState() {
     document.getElementById("filter").firstChild.nodeValue = useJS ? "JavaScript" : "WebCL";
 }
 
-function RunFilter()
-{
+function runFilter() {
     if (!isRunning) {
         outputContext.drawImage(jsInputImage, 0, 0);
         return;
     }
 
-    // Reset output image data
     var imageData = outputContext.getImageData(0, 0, width, height);
-    for (var i=0; i<imageData.data.length; i++)
+    for (var i = 0; i < imageData.data.length; i++)
         imageData.data[i] = 0;
 
     outputContext.putImageData(imageData, 0, 0);
 
     if (useJS)
-        RunFilterJS(t, cx, cy, diag);
+        runFilterJS(t, cx, cy, diag);
     else
-        RunFilterCL(t, cx, cy, diag);
+        runFilterCL(t, cx, cy, diag);
 
     t++;
-    requestAnimFrame(RunFilter);
+    requestAnimFrame(runFilter);
 }
 
-function ShowResults()
-{
+function showResults() {
     var delta = Math.max(1, tEnd - tStart);
     var fps = Math.floor(1000 / delta);
 
@@ -180,7 +169,6 @@ function ShowResults()
     document.getElementById("msec").style.visibility = "visible";
 }
 
-function HideResults()
-{
+function hideResults() {
     document.getElementById("msec").style.visibility = "hidden";
 }

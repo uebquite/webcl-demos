@@ -24,7 +24,7 @@ var localThreads = new Int32Array(2);
 var isCLActive = false;                     // prevent requeuing while still active
 
 
-function InitCL() {
+function initCL() {
     try {
         cl = webcl;
         if (cl === null) {
@@ -129,15 +129,15 @@ function releaseBuffers() {
     }
 }
 
-function RunFilterCL(t, cx, cy, diag) {
+function runFilterCL(t, cx, cy, diag) {
     if (isCLActive)
         return;
 
     isCLActive = true;
-    RunRippleCL(t, cx, cy, diag);
+    runRippleCL(t, cx, cy, diag);
 }
 
-function RunRippleCL(t, cx, cy, diag) {
+function runRippleCL(t, cx, cy, diag) {
     // Set the arguments to our compute kernel
     //
     var type = WebCLKernelArgumentTypes;
@@ -161,10 +161,10 @@ function RunRippleCL(t, cx, cy, diag) {
     // Wait for the command queue to get serviced before reading back results
     //
     queue.finish();
-    GetResults();
+    getResults();
 }
 
-function  GetResults() {
+function getResults() {
     tEnd = new Date().valueOf();
 
     // Read back the results from the device to verify the output
@@ -182,5 +182,5 @@ function  GetResults() {
 
     outputContext.putImageData(outputImageData, 0, 0);
 
-    ShowResults();
+    showResults();
 }

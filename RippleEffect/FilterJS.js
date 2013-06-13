@@ -1,5 +1,5 @@
 
-function RunFilterJS(t, cx, cy, diag) {
+function runFilterJS(t, cx, cy, diag) {
     var inputImageData = inputContext.getImageData(0, 0, width, height);
     var outputImageData = outputContext.getImageData(0, 0, width, height);
 
@@ -8,15 +8,15 @@ function RunFilterJS(t, cx, cy, diag) {
 
     tStart = new Date().valueOf();
 
-    RunRippleJS(inputPixels, outputPixels, t, cx, cy, diag);
+    runRippleJS(inputPixels, outputPixels, t, cx, cy, diag);
 
     tEnd = new Date().valueOf();
 
     outputContext.putImageData(outputImageData, 0, 0);
-    ShowResults();
+    showResults();
 }
 
-function RunRippleJS(inputPixels, outputPixels, t, cx, cy, diag) {
+function runRippleJS(inputPixels, outputPixels, t, cx, cy, diag) {
     var ix, iy, x, y;
     var iu, iv, u, v;
 
