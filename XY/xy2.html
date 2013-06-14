@@ -5,6 +5,7 @@
 <TITLE>XY model. Modified chess-board algorithm</TITLE>
 
 <script src="../common/gl.js" type="text/javascript"></script>
+<script src="../common/webcl.js" type="text/javascript"></script>
 
 <script id="clXY" type="text/x-opencl">
 
@@ -121,31 +122,12 @@ var IMAGE_REGION = new Int32Array([n, n2, 1]);
 function CL_rand () {
   try {
 
-      if (window.webcl == undefined) {
-      alert("Unfortunately your system does not support WebCL");
-      return false;
-    }
+    var kernelSrc = loadKernel("clXY");
 
-    var platforms = webcl.getPlatforms();
-
-    if (!platforms) {
-        alert("No WebCL platform found in your system")
-        return false;
-    }
-
-    var devices = platforms[0].getDevices(webcl.DEVICE_TYPE_GPU);
-
-    if (!devices) {
-        alert("No device found in your system")
-        return false;
-    }
-
-    var device = devices[0];
-
-    var ctxProps = {platform: platforms[0], devices: [device],
-            deviceType: webcl.DEVICE_TYPE_GPU, shareGroup: 0, hint: null};
-
-    var ctx = webcl.createContext(ctxProps);
+    WebCLCommon.init("ALL");
+    var ctx = WebCLCommon.createContext();
+    var program = WebCLCommon.createProgramBuild(kernelSrc);
+    cmdQueue = WebCLCommon.createCommandQueue();
 
     bufRand = ctx.createBuffer (webcl.MEM_READ_WRITE,randByteLength);
     var format = {channelOrder:webcl.RGBA, channelDataType:webcl.FLOAT,
@@ -156,20 +138,6 @@ function CL_rand () {
     iSpinW1 = ctx.createImage(webcl.MEM_READ_WRITE, format);
     iTemp   = ctx.createImage(webcl.MEM_READ_WRITE, format);
     bufPix  = ctx.createBuffer (webcl.MEM_WRITE_ONLY, bufSize);
-
-    var kernelSrc = loadKernel("clXY");
-    var program = ctx.createProgram(kernelSrc);
-
-    try {
-      program.build([device]);
-    } catch(e) {
-      alert ("Failed to build WebCL program. Error "
-        + program.getBuildInfo (device,
-           webcl.PROGRAM_BUILD_STATUS)
-        + ":  " + program.getBuildInfo (device,
-           webcl.PROGRAM_BUILD_LOG));
-      throw e;
-    }
 
     kSpinB = program.createKernel ("kSpinB");
     kSpinB.setArg(3, bufRand);
@@ -187,10 +155,8 @@ function CL_rand () {
         UIrand[i] = Math.floor(Math.random() * 4294967295);
     }
 
-    cmdQueue = ctx.createCommandQueue (device, 0);
-
     initImageSpin();
-    
+
     cmdQueue.enqueueWriteBuffer(bufRand, true, 0,randByteLength, UIrand);
     outBuffer = new Uint8Array(bufSize);
   } catch(e) {
