@@ -19,6 +19,19 @@ var cy = 0;
 var diag = 0;
 var touchDown = false;
 
+function getKernel(fileName) {
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", fileName, false);
+    xhr.send();
+    // HTTP reports success with a 200 status, file protocol reports
+    // success with a 0 status
+    if (xhr.status == 200 || xhr.status == 0) {
+        return xhr.responseText;
+    } else {
+        return null;
+    }
+};
+
 window.requestAnimFrame = (function () {
           return  window.requestAnimationFrame       ||
                   window.webkitRequestAnimationFrame ||

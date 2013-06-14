@@ -60,15 +60,14 @@ function initCL() {
 
         // Create the compute program from the source buffer
         //
-        kernelSource = getKernel("Ripple_kernel");
+        kernelSource = getKernel("ripple.cl");
         if (kernelSource === null) {
             console.error("No kernel named: " + "Ripple_kernel");
             return false;
         }
 
         filterProgram = context.createProgram(kernelSource);
-    }
-    catch (e) {
+    } catch (e) {
         console.error(e.message);
         return false;
     }
