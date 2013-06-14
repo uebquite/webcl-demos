@@ -1,0 +1,481 @@
+<html>
+<head>
+<title>WebCL AES Test</title>
+<meta HTTP-EQUIV="CACHE-CONTROL" CONTENT="NO-CACHE">
+
+<style type="text/css">
+.info {
+	font-family: Arial, Helvetica, sans-serif;
+	font-weight: bold;
+	font-size: 14px;
+	color: white;
+    text-align: right;
+}
+.button {
+   border-top: 1px solid #96d1f8;
+   background: #65a9d7;
+   background: -webkit-gradient(linear, left top, left bottom, from(#3e779d), to(#65a9d7));
+   background: -webkit-linear-gradient(top, #3e779d, #65a9d7);
+   background: -moz-linear-gradient(top, #3e779d, #65a9d7);
+   background: -ms-linear-gradient(top, #3e779d, #65a9d7);
+   background: -o-linear-gradient(top, #3e779d, #65a9d7);
+   padding: 4.25px 8px;
+   -webkit-border-radius: 6px;
+   -moz-border-radius: 6px;
+   border-radius: 6px;
+   -webkit-box-shadow: rgba(0,0,0,1) 0 1px 0;
+   -moz-box-shadow: rgba(0,0,0,1) 0 1px 0;
+   box-shadow: rgba(0,0,0,1) 0 1px 0;
+   text-shadow: rgba(0,0,0,.4) 0 1px 0;
+   color: white;
+   font-size: 14px;
+   font-family: Helvetica, Arial, Sans-Serif;
+   text-decoration: none;
+   vertical-align: center;
+}
+.button:active {
+   border-top-color: #1b435e;
+   background: #1b435e;
+}
+.button:hover {
+   border-top-color: #28597a;
+   background: #28597a;
+   color: #ccc;
+}
+</style>
+
+<script id="AESEncryptDecrypt" type="x-kernel">
+/**
+ * \File AESEncryptDecrypt_Kernels.cl
+ * \brief contains the kernels for encryption and decryption
+ */
+
+/* ============================================================
+
+Copyright (c) 2009-2010 Advanced Micro Devices, Inc.  All rights reserved.
+
+Redistribution and use of this material is permitted under the following
+conditions:
+
+Redistributions must retain the above copyright notice and all terms of this
+license.
+
+In no event shall anyone redistributing or accessing or using this material
+commence or participate in any arbitration or legal action relating to this
+material against Advanced Micro Devices, Inc. or any copyright holders or
+contributors. The foregoing shall survive any expiration or termination of
+this license or any agreement or access or use related to this material.
+
+ANY BREACH OF ANY TERM OF THIS LICENSE SHALL RESULT IN THE IMMEDIATE REVOCATION
+OF ALL RIGHTS TO REDISTRIBUTE, ACCESS OR USE THIS MATERIAL.
+
+THIS MATERIAL IS PROVIDED BY ADVANCED MICRO DEVICES, INC. AND ANY COPYRIGHT
+HOLDERS AND CONTRIBUTORS "AS IS" IN ITS CURRENT CONDITION AND WITHOUT ANY
+REPRESENTATIONS, GUARANTEE, OR WARRANTY OF ANY KIND OR IN ANY WAY RELATED TO
+SUPPORT, INDEMNITY, ERROR FREE OR UNINTERRUPTED OPERA TION, OR THAT IT IS FREE
+FROM DEFECTS OR VIRUSES.  ALL OBLIGATIONS ARE HEREBY DISCLAIMED - WHETHER
+EXPRESS, IMPLIED, OR STATUTORY - INCLUDING, BUT NOT LIMITED TO, ANY IMPLIED
+WARRANTIES OF TITLE, MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE,
+ACCURACY, COMPLETENESS, OPERABILITY, QUALITY OF SERVICE, OR NON-INFRINGEMENT.
+IN NO EVENT SHALL ADVANCED MICRO DEVICES, INC. OR ANY COPYRIGHT HOLDERS OR
+CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, PUNITIVE,
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
+OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, REVENUE, DATA, OR PROFITS; OR
+BUSINESS INTERRUPTION) HOWEVER CAUSED OR BASED ON ANY THEORY OF LIABILITY
+ARISING IN ANY WAY RELATED TO THIS MATERIAL, EVEN IF ADVISED OF THE POSSIBILITY
+OF SUCH DAMAGE. THE ENTIRE AND AGGREGATE LIABILITY OF ADVANCED MICRO DEVICES,
+INC. AND ANY COPYRIGHT HOLDERS AND CONTRIBUTORS SHALL NOT EXCEED TEN DOLLARS
+(US $10.00). ANYONE REDISTRIBUTING OR ACCESSING OR USING THIS MATERIAL ACCEPTS
+THIS ALLOCATION OF RISK AND AGREES TO RELEASE ADVANCED MICRO DEVICES, INC. AND
+ANY COPYRIGHT HOLDERS AND CONTRIBUTORS FROM ANY AND ALL LIABILITIES,
+OBLIGATIONS, CLAIMS, OR DEMANDS IN EXCESS OF TEN DOLLARS (US $10.00). THE
+FOREGOING ARE ESSENTIAL TERMS OF THIS LICENSE AND, IF ANY OF THESE TERMS ARE
+CONSTRUED AS UNENFORCEABLE, FAIL IN ESSENTIAL PURPOSE, OR BECOME VOID OR
+DETRIMENTAL TO ADVANCED MICRO DEVICES, INC. OR ANY COPYRIGHT HOLDERS OR
+CONTRIBUTORS FOR ANY REASON, THEN ALL RIGHTS TO REDISTRIBUTE, ACCESS OR USE
+THIS MATERIAL SHALL TERMINATE IMMEDIATELY. MOREOVER, THE FOREGOING SHALL
+SURVIVE ANY EXPIRATION OR TERMINATION OF THIS LICENSE OR ANY AGREEMENT OR
+ACCESS OR USE RELATED TO THIS MATERIAL.
+
+NOTICE IS HEREBY PROVIDED, AND BY REDISTRIBUTING OR ACCESSING OR USING THIS
+MATERIAL SUCH NOTICE IS ACKNOWLEDGED, THAT THIS MATERIAL MAY BE SUBJECT TO
+RESTRICTIONS UNDER THE LAWS AND REGULATIONS OF THE UNITED STATES OR OTHER
+COUNTRIES, WHICH INCLUDE BUT ARE NOT LIMITED TO, U.S. EXPORT CONTROL LAWS SUCH
+AS THE EXPORT ADMINISTRATION REGULATIONS AND NATIONAL SECURITY CONTROLS AS
+DEFINED THEREUNDER, AS WELL AS STATE DEPARTMENT CONTROLS UNDER THE U.S.
+MUNITIONS LIST. THIS MATERIAL MAY NOT BE USED, RELEASED, TRANSFERRED, IMPORTED,
+EXPORTED AND/OR RE-EXPORTED IN ANY MANNER PROHIBITED UNDER ANY APPLICABLE LAWS,
+INCLUDING U.S. EXPORT CONTROL LAWS REGARDING SPECIFICALLY DESIGNATED PERSONS,
+COUNTRIES AND NATIONALS OF COUNTRIES SUBJECT TO NATIONAL SECURITY CONTROLS.
+MOREOVER, THE FOREGOING SHALL SURVIVE ANY EXPIRATION OR TERMINATION OF ANY
+LICENSE OR AGREEMENT OR ACCESS OR USE RELATED TO THIS MATERIAL.
+
+NOTICE REGARDING THE U.S. GOVERNMENT AND DOD AGENCIES: This material is
+provided with "RESTRICTED RIGHTS" and/or "LIMITED RIGHTS" as applicable to
+computer software and technical data, respectively. Use, duplication,
+distribution or disclosure by the U.S. Government and/or DOD agencies is
+subject to the full extent of restrictions in all applicable regulations,
+including those found at FAR52.227 and DFARS252.227 et seq. and any successor
+regulations thereof. Use of this material by the U.S. Government and/or DOD
+agencies is acknowledgment of the proprietary rights of any copyright holders
+and contributors, including those of Advanced Micro Devices, Inc., as well as
+the provisions of FAR52.227-14 through 23 regarding privately developed and/or
+commercial computer software.
+
+This license forms the entire agreement regarding the subject matter hereof and
+supersedes all proposals and prior discussions and writings between the parties
+with respect thereto. This license does not affect any ownership, rights, title,
+or interest in, or relating to, this material. No terms of this license can be
+modified or waived, and no breach of this license can be excused, unless done
+so in a writing signed by all affected parties. Each term of this license is
+separately enforceable. If any term of this license is determined to be or
+becomes unenforceable or illegal, such term shall be reformed to the minimum
+extent necessary in order for this license to remain in effect in accordance
+with its terms as modified by such reformation. This license shall be governed
+by and construed in accordance with the laws of the State of Texas without
+regard to rules on conflicts of law of any state or jurisdiction or the United
+Nations Convention on the International Sale of Goods. All disputes arising out
+of this license shall be subject to the jurisdiction of the federal and state
+courts in Austin, Texas, and all defenses are hereby waived concerning personal
+jurisdiction and venue of these courts.
+
+============================================================ */
+
+
+inline uchar4
+sbox(uchar * SBox,
+		uchar4 block)
+{
+    return (uchar4)(SBox[block.x], SBox[block.y], SBox[block.z], SBox[block.w]);
+}
+
+uchar4
+shiftRows(uchar4 value,
+	unsigned int rowNumber)
+{
+	uchar4 tempValue = value;
+	for (unsigned int i = 0; i < rowNumber; i++)
+	{
+		tempValue = tempValue.yzwx;
+	}
+	return tempValue;
+}
+
+uchar4
+shiftRowsInv(uchar4 value,
+	unsigned int j)
+{
+    uchar4 tempValue = value;
+    for(uint i = 0; i < j; ++i)
+    {
+        tempValue = tempValue.wxyz;
+    }
+    return tempValue;
+}
+
+unsigned char
+galoisMultiplication(unsigned char a,
+	unsigned char b)
+{
+    unsigned char p = 0;
+    for(unsigned int i = 0; i < 8; ++i)
+    {
+        if((b & 1) == 1)
+        {
+            p ^= a;
+        }
+        unsigned char hiBitSet = (a & 0x80);
+        a <<= 1;
+        if(hiBitSet == 0x80)
+        {
+            a ^= 0x1b;
+        }
+        b >>= 1;
+    }
+    return p;
+}
+
+uchar4
+mixColumns(__local uchar4 * block,
+	__private uchar4 * galiosCoeff,
+	unsigned int j,
+	unsigned int localIndex,
+	unsigned int localSizex)
+{
+	unsigned int bw = 4;
+
+    uchar x, y, z, w;
+
+	unsigned int localIdx = localIndex - localSizex * j;
+
+	x = galoisMultiplication(block[localIdx].x,
+			galiosCoeff[(bw - j) % bw].x);
+    y = galoisMultiplication(block[localIdx].y,
+			galiosCoeff[(bw - j) % bw].x);
+    z = galoisMultiplication(block[localIdx].z,
+			galiosCoeff[(bw - j) % bw].x);
+    w = galoisMultiplication(block[localIdx].w,
+			galiosCoeff[(bw - j) % bw].x);
+
+    for(unsigned int k = 1; k < 4; ++k)
+    {
+        x ^= galoisMultiplication(block[k * localSizex + localIdx].x,
+				galiosCoeff[(k + bw - j) % bw].x);
+        y ^= galoisMultiplication(block[k * localSizex + localIdx].y,
+				galiosCoeff[(k + bw - j) % bw].x);
+        z ^= galoisMultiplication(block[k * localSizex + localIdx].z,
+				galiosCoeff[(k + bw - j) % bw].x);
+        w ^= galoisMultiplication(block[k * localSizex + localIdx].w,
+				galiosCoeff[(k + bw - j) % bw].x);
+    }
+
+	return (uchar4)(x, y, z, w);
+}
+
+__kernel
+void AESEncrypt(__global  uchar4  * output  ,
+                __global  uchar4  * input   ,
+                __global  uchar4  * roundKey,
+                __local   uchar4  * block0  ,
+                __local   uchar4  * block1  ,
+                const     uint     rounds   )
+
+{
+	uchar sboxC[256] =
+	   { 0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76 //0
+	   , 0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0 //1
+	   , 0xb7, 0xfd, 0x93, 0x26, 0x36, 0x3f, 0xf7, 0xcc, 0x34, 0xa5, 0xe5, 0xf1, 0x71, 0xd8, 0x31, 0x15 //2
+	   , 0x04, 0xc7, 0x23, 0xc3, 0x18, 0x96, 0x05, 0x9a, 0x07, 0x12, 0x80, 0xe2, 0xeb, 0x27, 0xb2, 0x75 //3
+	   , 0x09, 0x83, 0x2c, 0x1a, 0x1b, 0x6e, 0x5a, 0xa0, 0x52, 0x3b, 0xd6, 0xb3, 0x29, 0xe3, 0x2f, 0x84 //4
+	   , 0x53, 0xd1, 0x00, 0xed, 0x20, 0xfc, 0xb1, 0x5b, 0x6a, 0xcb, 0xbe, 0x39, 0x4a, 0x4c, 0x58, 0xcf //5
+	   , 0xd0, 0xef, 0xaa, 0xfb, 0x43, 0x4d, 0x33, 0x85, 0x45, 0xf9, 0x02, 0x7f, 0x50, 0x3c, 0x9f, 0xa8 //6
+	   , 0x51, 0xa3, 0x40, 0x8f, 0x92, 0x9d, 0x38, 0xf5, 0xbc, 0xb6, 0xda, 0x21, 0x10, 0xff, 0xf3, 0xd2 //7
+	   , 0xcd, 0x0c, 0x13, 0xec, 0x5f, 0x97, 0x44, 0x17, 0xc4, 0xa7, 0x7e, 0x3d, 0x64, 0x5d, 0x19, 0x73 //8
+	   , 0x60, 0x81, 0x4f, 0xdc, 0x22, 0x2a, 0x90, 0x88, 0x46, 0xee, 0xb8, 0x14, 0xde, 0x5e, 0x0b, 0xdb //9
+	   , 0xe0, 0x32, 0x3a, 0x0a, 0x49, 0x06, 0x24, 0x5c, 0xc2, 0xd3, 0xac, 0x62, 0x91, 0x95, 0xe4, 0x79 //A
+	   , 0xe7, 0xc8, 0x37, 0x6d, 0x8d, 0xd5, 0x4e, 0xa9, 0x6c, 0x56, 0xf4, 0xea, 0x65, 0x7a, 0xae, 0x08 //B
+	   , 0xba, 0x78, 0x25, 0x2e, 0x1c, 0xa6, 0xb4, 0xc6, 0xe8, 0xdd, 0x74, 0x1f, 0x4b, 0xbd, 0x8b, 0x8a //C
+	   , 0x70, 0x3e, 0xb5, 0x66, 0x48, 0x03, 0xf6, 0x0e, 0x61, 0x35, 0x57, 0xb9, 0x86, 0xc1, 0x1d, 0x9e //D
+	   , 0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e, 0x94, 0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55, 0x28, 0xdf //E
+	   , 0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16};//F
+		//0      1    2      3     4    5     6     7      8    9     A      B    C     D     E     F
+
+	//calculating the local_id values
+	unsigned int localIdx = get_local_id(0);
+	unsigned int localIdy = get_local_id(1);
+
+	//calculating global id values
+	unsigned int globalIdx = get_global_id(0);
+	unsigned int globalIdy = get_global_id(1);
+
+	//calculating the block_id values
+	unsigned int blockIdx = get_group_id(0);
+	unsigned int blockIdy = get_group_id(1);
+
+	//calculating NDRange sizes
+	unsigned int ndRangeSizex = get_global_size(0);
+	unsigned int ndRangeSizey = get_global_size(1);
+
+	//calculating block size
+	unsigned int localSizex = get_local_size(0);
+	unsigned int localSizey = get_local_size(1);
+
+	//calculating the localIndex value in the block
+	unsigned int localIndex = localIdy * (localSizex) + localIdx;
+
+	//calculating the global index value
+	unsigned int globalIndex1 = localIndex +
+									(localSizex * localSizey *
+									(blockIdx + blockIdy * (ndRangeSizex / localSizex)));
+
+	unsigned int globalIndex = globalIdy * ndRangeSizex + globalIdx;
+
+	block0[localIndex] = input[globalIndex];
+
+	/**
+	* Applying AES algorithm
+	**/
+
+	//1. addRoundKey
+	block0[localIndex] ^= roundKey[localIdy];
+
+	__private uchar4 galiosCoeff[4];
+    galiosCoeff[0] = (uchar4)(2, 0, 0, 0);
+    galiosCoeff[1] = (uchar4)(3, 0, 0, 0);
+    galiosCoeff[2] = (uchar4)(1, 0, 0, 0);
+    galiosCoeff[3] = (uchar4)(1, 0, 0, 0);
+
+	//Rounds
+	for (int i = 1; i < rounds; i++)
+	{
+		//1. subytes
+		block0[localIndex] = sbox(sboxC, block0[localIndex]);
+
+		//2. shiftRows
+		block0[localIndex] = shiftRows(block0[localIndex],
+								localIdy);
+		barrier(CLK_LOCAL_MEM_FENCE);//local memory synchronization
+
+		//3. mixCols
+		block1[localIndex]  = mixColumns(block0,
+								galiosCoeff,
+								localIdy,
+								localIndex,
+								localSizex);
+		barrier(CLK_LOCAL_MEM_FENCE);//local memory synchronization
+
+		//4. addRoundKey
+		block0[localIndex] = block1[localIndex] ^ roundKey[i * 4 + localIdy];
+	}
+
+	//1. subBytes
+	block0[localIndex] = sbox(sboxC, block0[localIndex]);
+
+	//2. shiftRows
+	block0[localIndex] = shiftRows(block0[localIndex],
+							localIdy);
+
+	//3. addRoundKey
+	block0[localIndex] ^= roundKey[localIdy + rounds * 4];
+
+	output[globalIndex] = block0[localIndex];
+}
+
+__kernel
+void AESDecrypt(__global  uchar4  * output    ,
+                __global  uchar4  * input     ,
+                __global  uchar4  * roundKey  ,
+                __local   uchar4  * block0    ,
+                __local   uchar4  * block1    ,
+                const     uint      rounds    )
+
+{
+	uchar rsboxC[256] =
+		{ 0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38, 0xbf, 0x40, 0xa3, 0x9e, 0x81, 0xf3, 0xd7, 0xfb
+		, 0x7c, 0xe3, 0x39, 0x82, 0x9b, 0x2f, 0xff, 0x87, 0x34, 0x8e, 0x43, 0x44, 0xc4, 0xde, 0xe9, 0xcb
+		, 0x54, 0x7b, 0x94, 0x32, 0xa6, 0xc2, 0x23, 0x3d, 0xee, 0x4c, 0x95, 0x0b, 0x42, 0xfa, 0xc3, 0x4e
+		, 0x08, 0x2e, 0xa1, 0x66, 0x28, 0xd9, 0x24, 0xb2, 0x76, 0x5b, 0xa2, 0x49, 0x6d, 0x8b, 0xd1, 0x25
+		, 0x72, 0xf8, 0xf6, 0x64, 0x86, 0x68, 0x98, 0x16, 0xd4, 0xa4, 0x5c, 0xcc, 0x5d, 0x65, 0xb6, 0x92
+		, 0x6c, 0x70, 0x48, 0x50, 0xfd, 0xed, 0xb9, 0xda, 0x5e, 0x15, 0x46, 0x57, 0xa7, 0x8d, 0x9d, 0x84
+		, 0x90, 0xd8, 0xab, 0x00, 0x8c, 0xbc, 0xd3, 0x0a, 0xf7, 0xe4, 0x58, 0x05, 0xb8, 0xb3, 0x45, 0x06
+		, 0xd0, 0x2c, 0x1e, 0x8f, 0xca, 0x3f, 0x0f, 0x02, 0xc1, 0xaf, 0xbd, 0x03, 0x01, 0x13, 0x8a, 0x6b
+		, 0x3a, 0x91, 0x11, 0x41, 0x4f, 0x67, 0xdc, 0xea, 0x97, 0xf2, 0xcf, 0xce, 0xf0, 0xb4, 0xe6, 0x73
+		, 0x96, 0xac, 0x74, 0x22, 0xe7, 0xad, 0x35, 0x85, 0xe2, 0xf9, 0x37, 0xe8, 0x1c, 0x75, 0xdf, 0x6e
+		, 0x47, 0xf1, 0x1a, 0x71, 0x1d, 0x29, 0xc5, 0x89, 0x6f, 0xb7, 0x62, 0x0e, 0xaa, 0x18, 0xbe, 0x1b
+		, 0xfc, 0x56, 0x3e, 0x4b, 0xc6, 0xd2, 0x79, 0x20, 0x9a, 0xdb, 0xc0, 0xfe, 0x78, 0xcd, 0x5a, 0xf4
+		, 0x1f, 0xdd, 0xa8, 0x33, 0x88, 0x07, 0xc7, 0x31, 0xb1, 0x12, 0x10, 0x59, 0x27, 0x80, 0xec, 0x5f
+		, 0x60, 0x51, 0x7f, 0xa9, 0x19, 0xb5, 0x4a, 0x0d, 0x2d, 0xe5, 0x7a, 0x9f, 0x93, 0xc9, 0x9c, 0xef
+		, 0xa0, 0xe0, 0x3b, 0x4d, 0xae, 0x2a, 0xf5, 0xb0, 0xc8, 0xeb, 0xbb, 0x3c, 0x83, 0x53, 0x99, 0x61
+		, 0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26, 0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d};
+
+	//calculating the local_id values
+	unsigned int localIdx = get_local_id(0);
+	unsigned int localIdy = get_local_id(1);
+
+	//calculating global id values
+	unsigned int globalIdx = get_global_id(0);
+	unsigned int globalIdy = get_global_id(1);
+
+	//calculating the block_id values
+	unsigned int blockIdx = get_group_id(0);
+	unsigned int blockIdy = get_group_id(1);
+
+	//calculating NDRange sizes
+	unsigned int ndRangeSizex = get_global_size(0);
+	unsigned int ndRangeSizey = get_global_size(1);
+
+	//calculating block size
+	unsigned int localSizex = get_local_size(0);
+	unsigned int localSizey = get_local_size(1);
+
+	//calculating the localIndex value in the block
+	unsigned int localIndex = localIdy * (localSizex) + localIdx;
+
+	//calculating the global index value
+	unsigned int globalIndex1 = localIndex +
+									(localSizex * localSizey *
+									(blockIdx + blockIdy * (ndRangeSizex / localSizex)));
+
+	unsigned int globalIndex = globalIdy * ndRangeSizex + globalIdx;
+
+	block0[localIndex] = input[globalIndex];
+
+	__private uchar4 galiosCoeff[4];
+    galiosCoeff[0] = (uchar4)(14, 0, 0, 0);
+    galiosCoeff[1] = (uchar4)(11, 0, 0, 0);
+    galiosCoeff[2] = (uchar4)(13, 0, 0, 0);
+    galiosCoeff[3] = (uchar4)(9, 0, 0, 0);
+
+    //1. addRoundKey
+    block0[localIndex] ^= roundKey[4 * rounds + localIdy];
+
+	for(unsigned int r = rounds - 1; r > 0; --r)
+    {
+		//1. shiftRowsInv
+		block0[localIndex] = shiftRowsInv(block0[localIndex],
+								localIdy);
+
+		//2. sbox
+		block0[localIndex] = sbox(rsboxC, block0[localIndex]);
+		barrier(CLK_LOCAL_MEM_FENCE);//local memory synchronization
+
+		//3. addRoundKey
+		block1[localIndex] = block0[localIndex] ^ roundKey[r * 4 + localIdy];
+		barrier(CLK_LOCAL_MEM_FENCE);//local memory synchronization
+
+		//4. mixColumns
+		block0[localIndex]  = mixColumns(block1,
+								galiosCoeff,
+								localIdy,
+								localIndex,
+								localSizex);
+    }
+
+	//1. shiftRowsInv
+	block0[localIndex] = shiftRowsInv(block0[localIndex],
+							localIdy);
+
+	//2. sbox
+	block0[localIndex] = sbox(rsboxC, block0[localIndex]);
+
+	output[globalIndex] =  block0[localIndex] ^ roundKey[localIdy];
+}
+</script>
+
+<script>
+function getKernel (id ) {
+	var kernelScript = document.getElementById( id );
+	if(kernelScript === null || kernelScript.type !== "x-kernel")
+		return null;
+
+	return kernelScript.firstChild.textContent;
+	/*var k = kernelScript.firstChild;
+	  var str = "";
+
+	  while ( k ) {
+	  if ( k.nodeType == 3 ) {
+	  str += k.textContent;
+	  }
+	  k = k.nextSibling;
+	  }
+	  return str;*/
+}
+</script>
+
+<script src="aes.js"></script>
+
+</head>
+
+<body onload="InitCL()" bgcolor="black">
+<div style="position:absolute; left:0px; top:0px">
+<div id="enc" class="button" onclick="EncryptCL(10)" style="position:absolute; left:  5px; top:5px; width:50px; height:20px">Encrypt</div>
+<div id="dec" class="button" onclick="DecryptCL(10)" style="position:absolute; left: 85px; top:5px; width:50px; height:20px">Decrypt</div>
+
+<div id="res" class="info" style="position:absolute; left:10px; top:40px; width:40px;">Results:</div>
+<div id="bps" class="info" style="position:absolute; left:60px; top:40px; width:260px;">XX</div>
+
+</div>
+</body>
+</html>
+
+
