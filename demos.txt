@@ -9,3 +9,4 @@ Smoke Vision      |            No            |      Yes      |           No     
 Sobel Filter      |            Yes           |      No       |           No             |        Yes        |      Yes        |
 XY Model          |            No            |      Yes      |           No             |        Yes        |      Yes        |
 3D XY Model       |            No            |      Yes      |           No             |        Yes        |      Yes        |
+AES               |            No            |      No       |           No             |        No         |      Yes        |
