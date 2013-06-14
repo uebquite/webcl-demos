@@ -171,9 +171,9 @@ function InitWebCL()
          program.build(device_id);
       } catch(e) {
          alert ("Failed to build WebCL program. Error " +
-         program.getProgramBuildInfo(device_id,cl.PROGRAM_BUILD_STATUS) +
+         program.getBuildInfo(device_id,cl.PROGRAM_BUILD_STATUS) +
          + ":  "
-         + program.getProgramBuildInfo(device_id,cl.PROGRAM_BUILD_LOG));
+         + program.getBuildInfo(device_id,cl.PROGRAM_BUILD_LOG));
          throw e;
       }
 

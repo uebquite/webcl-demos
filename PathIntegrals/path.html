@@ -268,12 +268,12 @@ function buildProgram()
   kernelSrc = loadKernel("clProg");
   program = context.createProgram(kernelSrc);
   try {
-    program.build (device, "");
+    program.build (device);
   } catch(e) {
     alert ("Failed to build WebCL program. Error " +
-      program.getProgramBuildInfo(device,WebCL.PROGRAM_BUILD_STATUS) +
+      program.getBuildInfo(device,WebCL.PROGRAM_BUILD_STATUS) +
       + ":  "
-      + program.getProgramBuildInfo(device,WebCL.PROGRAM_BUILD_LOG));
+      + program.getBuildInfo(device,WebCL.PROGRAM_BUILD_LOG));
     throw e;
   }
 }
