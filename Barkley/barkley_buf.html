@@ -44,62 +44,77 @@ function loadKernel ( id ){
    return str;
 }
 
-var n = 512, n2 = n-2, kBarkley, kShow, cmdQueue, b0, b1, ev,
-  data, bufPix, outBuffer, bufSize, bufPixelSize,
+var n = 512, n2 = n-2, kBarkley, kShow, b0, b1, ev,
+  data, bufPix, outBuffer, bufSize=2*n*n, bufPixelSize=4*n*n,
   delay = 0, frames = 0, time, animation,
   a = .8, b = .01, dt = .05, eps = .02, h = .5;
 var types = WebCLKernelArgumentTypes;
+var ctx, program, cmdQueue, platform, kernelSrc;
+var useGPU = false;
 
 function CL_prog() {
+  data = new Float32Array(bufSize);
+  initInputArray(data);
+  if (webcl == undefined) {
+    alert("Unfortunately your system does not support WebCL");
+    return false;
+  }
+
+  var platforms = webcl.getPlatforms();
+  if(platforms.length === 0) {
+    alert("No WebCL platform available");
+    return false;
+  }
+
+  platform = platforms[0];
+  kernelSrc = loadKernel("clProgram");
+  initWebCL();
+
+  var canvas = document.getElementById("c");
+  init_gl(canvas);
+  outBuffer = new Uint8Array(bufPixelSize);
+  setInterval(fr, 500);
+  time = new Date().getTime();
+  animation = "animate";
+  anim();
+}
+
+function initWebCL() {
   var output = document.getElementById("output");
   output.innerHTML = "";
+
   try {
-    if (webcl == undefined) {
-      alert("Unfortunately your system does not support WebCL");
-      return false;
-    }
 
-    var platforms = webcl.getPlatforms();
-    if(platforms.length === 0) {
-      alert("No WebCL platform available");
-      return false;
-    }
+    var deviceType = useGPU ? webcl.DEVICE_TYPE_GPU : webcl.DEVICE_TYPE_CPU;
 
-    var platform = platforms[0];
-
-    var platDevices = platform.getDevices(webcl.DEVICE_TYPE_GPU);
+    var platDevices = platform.getDevices(deviceType);
     if(platDevices.length === 0) {
         alert("No WebCL devices available");
         return false;
     }
 
     var device = platDevices[0];
-    var contextProperties = {platform: platform, devices: device,
-                             deviceType: webcl.DEVICE_TYPE_GPU, shareGroup: 0, hint: null};
-    var ctx = webcl.createContext(contextProperties);
+    var contextProperties = {platform: platform, devices: [device],
+                             deviceType: deviceType, shareGroup: 0, hint: null};
+    ctx = webcl.createContext(contextProperties);
     if(!ctx) {
       alert("WebCL context was not created");
       return false;
     }
 
-    var kernelSrc = loadKernel("clProgram");
-    var program = ctx.createProgram(kernelSrc);
+    program = ctx.createProgram(kernelSrc);
     try {
-      program.build(device);
+      program.build([device]);
     } catch(e) {
       alert ("Failed to build WebCL program. Error " +
         program.getBuildInfo(device, webcl.PROGRAM_BUILD_STATUS) +
         + ":  "
         + program.getBuildInfo(device, webcl.PROGRAM_BUILD_LOG));
-      throw e;
+      return;
     }
 
-    bufSize = 2*n*n;
     b0 = ctx.createBuffer(webcl.MEM_READ_WRITE, 4*bufSize);
     b1 = ctx.createBuffer(webcl.MEM_READ_WRITE, 4*bufSize);
-
-    data = new Float32Array(bufSize);
-    initInputArray(data);
 
     kBarkley = program.createKernel("kBarkley");
     kBarkley.setArg(2, 1/a, types.FLOAT);
@@ -108,26 +123,20 @@ function CL_prog() {
     kBarkley.setArg(5, dt/eps, types.FLOAT);
     kBarkley.setArg(6, dt/(h*h), types.FLOAT);
 
-    bufPixelSize = 4*n*n;
     bufPix = ctx.createBuffer(webcl.MEM_WRITE_ONLY, bufPixelSize);
     kShow = program.createKernel("kShow");
     kShow.setArg(1, bufPix);
 
-    cmdQueue = ctx.createCommandQueue();
+    if(cmdQueue) {
+      cmdQueue.finish();
+    }
+    cmdQueue = ctx.createCommandQueue(device);
 
     cmdQueue.enqueueWriteBuffer(b0, true, 0, 4*bufSize, data);
   } catch(e) {
     document.getElementById("output").innerHTML
       += "<h3>ERROR:</h3><pre style=\"color:red;\">" + e.message + "</pre>";
-    throw e;
   }
-  var canvas = document.getElementById("c");
-  init_gl(canvas);
-  outBuffer = new Uint8Array(bufPixelSize);
-  setInterval(fr, 500);
-  time = new Date().getTime();
-  animation = "animate";
-  anim();
 }
 
 function initInputArray(inputArray) {
@@ -180,6 +189,7 @@ function run(v) {
   }
 }
 function reset() {
+  initWebCL();
   if( animation == "stop" ){
     animation = "reset";
     document.getElementById('runBtn').value = "Stop";
@@ -208,6 +218,7 @@ function setDt(v) {
 function setDelay(val) {
   delay = parseInt(val);
 }
+
 </script>
 <style type="text/css">
   H1{ font-size: 120%; color: green}
@@ -224,6 +235,8 @@ function setDelay(val) {
 <input type="button" onclick="run()" value="Stop" size="1" id="runBtn">
 delay<input size="1" value="0" onchange="setDelay( this.value )">
 fps<input size="1" id="framerate">
+GPU<input type="radio" name="device" id="GPUradio" onclick="useGPU=true;reset()">
+CPU<input type="radio" name="device" id="CPUradio" onclick="useGPU=false;reset()" checked="true">
 
 <p>Barkley model on <i>512&times;512</i> square grid.
 <i>u, v = 0</i> at the square border. Data are stored in buffers.
