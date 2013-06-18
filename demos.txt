@@ -1,7 +1,7 @@
 DEMO              | Compare against pure JS  |   Uses WebGL  |    Uses WebCLGL interop  |   Works with GPU  | Works with CPU  |
 
 Barkley           |            No            |      Yes      |           No             |        Yes        |      Yes        |
-Fluid Dynamics    |            No            |      Yes      |           No             |        Yes        |      No         |
+Fluid Dynamics    |            No            |      Yes      |           No             |        Yes        |      Yes        |
 Mandelbrot Expl.  |            No            |      Yes      |           No             |        Yes        |      Yes        |
 Path Integrals    |            No            |      Yes      |           Yes            |        Yes        |      Yes        |
 Small Path Tracing|            No            |      Yes      |           No             |        Yes        |      No         |

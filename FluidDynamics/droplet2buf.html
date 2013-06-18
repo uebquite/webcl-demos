@@ -81,8 +81,8 @@ function loadKernel ( id ){
 }
 
 var n = 512, kAdvec, kForce, kP, kG, kDiv, kShow, cmdQueue,
-  U, U1, D, D1, P, P1, G,
-  bufPix, outPix, bufferSize = 4*n*n,
+  U, U1, D, D1, P, P1, G, frTimer,
+  bufPix, outPix, bufferSize = 4*n*n, useGpu = true, currentDevice,
   bu = 10, it = 20, delay = 0, frames = 0, time, animation;
 var types = WebCLKernelArgumentTypes;
 window.WebCL = webcl;
@@ -103,15 +103,16 @@ function CL_prog() {
 
     var platform = platforms[0];
 
-    var platDevices = platform.getDevices(WebCL.DEVICE_TYPE_GPU);
+    currentDevice = useGpu ? WebCL.DEVICE_TYPE_GPU : WebCL.DEVICE_TYPE_CPU;
+    var platDevices = platform.getDevices(currentDevice);
     if(platDevices.length === 0) {
         alert("No devices available");
         return false;
     }
 
     var device = platDevices[0];
-    var contextProperties = {platform: platform, devices: device,
-                             deviceType: WebCL.DEVICE_TYPE_ALL, shareGroup: 0, hint: null};
+    var contextProperties = {platform: platform, devices: [device],
+                             deviceType: currentDevice, shareGroup: 0, hint: null};
 
     var context = WebCL.createContext(contextProperties);
 
@@ -147,7 +148,7 @@ function CL_prog() {
     kP.setArg(1, G);
     kDiv = program.createKernel("kDiv");
 
-    cmdQueue = context.createCommandQueue(device, 0);
+    cmdQueue = context.createCommandQueue(device);
 
     var inkDensity = new Float32Array( n*n );
     var t = 0, h = 1/n, d;
@@ -179,20 +180,20 @@ function CL_prog() {
   init_gl(canvas, false);
   outPix = new Uint8Array(4*n*n);
 
-  setInterval(fr, 500);
+  frTimer = setInterval(fr, 500);
   time = new Date().getTime();
   animation = "animate";
   anim();
 }
 
-function draw(){
+function draw() {
   kAdvec.setArg(0, U);
   kAdvec.setArg(1, D);
   kAdvec.setArg(2, U1);
   kAdvec.setArg(3, D1);
   var globalWorkSize = new Int32Array([n,n]);
-  var localWorkSize = new Int32Array([8,8]);
-  var ev = cmdQueue.enqueueNDRangeKernel(kAdvec, [], globalWorkSize, localWorkSize, []);
+
+  var ev = cmdQueue.enqueueNDRangeKernel(kAdvec, [], globalWorkSize, null);
   cmdQueue.flush();
   var tmp;
   tmp = D;  D = D1;  D1 = tmp;
@@ -201,18 +202,18 @@ function draw(){
   kForce.setArg(0, U);
   kForce.setArg(1, D);
   kForce.setArg(2, U1);
-  ev = cmdQueue.enqueueNDRangeKernel(kForce, [], globalWorkSize, localWorkSize);
+  ev = cmdQueue.enqueueNDRangeKernel(kForce, [], globalWorkSize, null);
   cmdQueue.flush();
   tmp = U;  U = U1;  U1 = tmp;
 
   kG.setArg(0, U);
-  ev = cmdQueue.enqueueNDRangeKernel(kG, [], globalWorkSize, localWorkSize);
+  ev = cmdQueue.enqueueNDRangeKernel(kG, [], globalWorkSize, null);
   cmdQueue.flush();
 
   for(var j = 0; j < it; j++){
     kP.setArg(0, P);
     kP.setArg(2, P1);
-    ev = cmdQueue.enqueueNDRangeKernel(kP, [], globalWorkSize, localWorkSize);
+    ev = cmdQueue.enqueueNDRangeKernel(kP, [], globalWorkSize, null);
     cmdQueue.flush();
     tmp = P;  P = P1;  P1 = tmp;
   }
@@ -220,18 +221,19 @@ function draw(){
   kDiv.setArg(0, U);
   kDiv.setArg(1, P);
   kDiv.setArg(2, U1);
-  ev = cmdQueue.enqueueNDRangeKernel(kDiv, [], globalWorkSize, localWorkSize);
+  ev = cmdQueue.enqueueNDRangeKernel(kDiv, [], globalWorkSize, null);
   cmdQueue.flush();
   tmp = U;  U = U1;  U1 = tmp;
 
   kShow.setArg(0, D);
-  cmdQueue.enqueueNDRangeKernel(kShow, [], globalWorkSize, localWorkSize);
+  cmdQueue.enqueueNDRangeKernel(kShow, [], globalWorkSize, null);
   cmdQueue.finish();
   cmdQueue.enqueueReadBuffer(bufPix, true, 0, bufferSize, outPix);
   draw_gl(n, n, outPix);
   frames++;
 }
-function anim(){
+
+function anim() {
    draw();
    switch ( animation ){
      case "reset":
@@ -264,6 +266,7 @@ function anim(){
        break;
    }
 }
+
 function run(v) {
   if( animation == "animate" ){
     animation = "stop";
@@ -274,6 +277,7 @@ function run(v) {
     anim();
   }
 }
+
 function reset() {
   if( animation == "stop" ){
     animation = "reset";
@@ -281,22 +285,32 @@ function reset() {
     anim();}
   else animation = "reset";
 }
-function fr(){
+
+function fr() {
   var ti = new Date().getTime();
   var fps = Math.round(1000*frames/(ti - time));
   document.getElementById("framerate").value = fps;
   frames = 0;  time = ti;
 }
+
 function setDelay(val) {
   delay = parseInt(val);
 }
+
 function setIt(val) {
   it = parseInt(val);
 }
+
 function setBu(v) {
-  bu = v.valueOf();             //    c = dt*b/2
+  bu = v.valueOf();
   kForce.setArg(3, .001*.5*bu, types.FLOAT);
 }
+
+function resetCL() {
+  window.clearInterval(frTimer);
+  CL_prog();
+}
+
 </script>
 <style type="text/css">
   H1{ font-size: 120%; color: green}
@@ -312,8 +326,11 @@ function setBu(v) {
 <br><button onclick="reset()">Reset</button>
 <input type="button" onclick="run()" value="Stop" size="1" id="runBtn">
 &beta;<input size="2" value="10" onchange="setBu( this.value )">
-It<input size="1" value="20" onchange="setIt( this.value )">
-delay<input size="1" value="0" onchange="setDelay( this.value )">
-fps<input size="1" id="framerate">
+It<input size="2" value="20" onchange="setIt( this.value )">
+delay<input size="2" value="0" onchange="setDelay( this.value )">
+fps<input size="3" id="framerate">
+Device:
+<input type="radio" name="r2" id="CPU" onclick="useGpu=false;resetCL()">CPU
+<input type="radio" name="r2" id="GPU" onclick="useGpu=true;resetCL()" checked="true">GPU
 
 </body></html>
