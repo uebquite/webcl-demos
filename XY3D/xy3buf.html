@@ -7,6 +7,7 @@
 
 <script src="CanvasMatrix.js" type="text/javascript"></script>
 <script src="xy3d_gl.js" type="text/javascript"></script>
+<script src="../common/webcl.js" type="text/javascript"></script>
 
 <script id="clXY" type="text/x-opencl">
 
@@ -141,52 +142,16 @@ var LOCAL_WORK_SIZE = new Int32Array([4,4,4]);
 
 function CL_rand () {
   try {
-    if (webcl == undefined) {
-      alert("Unfortunately your system does not support WebCL");
-      return false;
-    }
-
-    var platforms = webcl.getPlatforms();
-    if(platforms.length === 0) {
-      alert("No WebCL platform available");
-      return false;
-    }
-
-    var platform = platforms[0];
-
-    var platDevices = platform.getDevices(webcl.DEVICE_TYPE_GPU);
-    if(platDevices.length === 0) {
-        alert("No WebCL devices available");
-        return false;
-    }
-
-    var device = platDevices[0];
-    var contextProperties = {platform: platform, devices: device,
-                             deviceType: webcl.DEVICE_TYPE_GPU, shareGroup: 0, hint: null};
-    var ctx = webcl.createContext(contextProperties);
-    if(!ctx) {
-      alert("WebCL context was not created");
-      return false;
-    }
-
-    var UIrand = new Uint32Array(elemNumber);
-    for ( var i = 0; i < elemNumber;  i++ )
-      UIrand[i] = Math.floor(Math.random() * 4294967295);
+    WebCLCommon.init("GPU");
+    var ctx = WebCLCommon.createContext();
+    var kernelSrc = loadKernel("clXY");
+    var program = WebCLCommon.createProgramBuild(kernelSrc);
+    cmdQueue = WebCLCommon.createCommandQueue();
 
     bufRand = ctx.createBuffer(webcl.MEM_READ_WRITE, bufSize);
     bSpin   = ctx.createBuffer(webcl.MEM_READ_WRITE, bufSize);
     bufPix  = ctx.createBuffer(webcl.MEM_WRITE_ONLY, bufSize);
 
-    var kernelSrc = loadKernel("clXY");
-    var program = ctx.createProgram(kernelSrc);
-    try {
-      program.build(device);
-    } catch(e) {
-      alert ("Failed to build WebCL program. Error "
-        + program.getBuildInfo(device, webcl.PROGRAM_BUILD_STATUS)
-        + ":  " + program.getBuildInfo(device, webcl.PROGRAM_BUILD_LOG));
-      throw e;
-    }
     kSpin = program.createKernel ("kSpin");
     kSpin.setArg(0, bSpin);
     kSpin.setArg(1, bufRand);
@@ -195,8 +160,12 @@ function CL_rand () {
     kPix.setArg(0, bSpin);
     kPix.setArg(1, bufPix);
 
-    cmdQueue = ctx.createCommandQueue();
+    var UIrand = new Uint32Array(elemNumber);
+    for ( var i = 0; i < elemNumber;  i++ )
+      UIrand[i] = Math.floor(Math.random() * 4294967295);
+
     initSpinBuffer();
+
     cmdQueue.enqueueWriteBuffer(bufRand, true, 0, bufSize, UIrand);
     outBuffer = new Uint8Array(bufSize);
   } catch(e) {
