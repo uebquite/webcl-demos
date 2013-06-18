@@ -3,7 +3,7 @@ DEMO              | Compare against pure JS  |   Uses WebGL  |    Uses WebCLGL i
 Barkley           |            No            |      Yes      |           No             |        Yes        |      Yes        |
 Fluid Dynamics    |            No            |      Yes      |           No             |        Yes        |      No         |
 Mandelbrot Expl.  |            No            |      Yes      |           No             |        Yes        |      Yes        |
-Path Integrals    |            No            |      Yes      |           Yes            |        Yes        |      No         |
+Path Integrals    |            No            |      Yes      |           Yes            |        Yes        |      Yes        |
 Small Path Tracing|            No            |      Yes      |           No             |        Yes        |      No         |
 Smoke Vision      |            No            |      Yes      |           No             |        Yes        |      Yes        |
 Sobel Filter      |            Yes           |      No       |           No             |        Yes        |      Yes        |

@@ -165,8 +165,8 @@ function loadKernel ( id ){
 var gl;
 var ctx_c, n = 1024, it = 10, ev, bufferSize = 4*4*n,
     frames = 0, animation = "animate", time, delay = 0,
-    interop = false;
-var program, device,kernelSrc, platform;
+    interop = false, useGpu = true, currentDevice;
+var program, device,kernelSrc, platform, frTimer;
 var kPath, kPix, kPixXY, kPixXT, kPixYT, cmdQueue, iPath, iPath1,
     bufPix, outBuffer, bufRand, context = null;
 var types = WebCLKernelArgumentTypes;
@@ -192,8 +192,9 @@ function CL_start() {
     }
 
     platform = platforms[0];
+    currentDevice = useGpu ? WebCL.DEVICE_TYPE_GPU : WebCL.DEVICE_TYPE_CPU;
 
-    var platDevices = platform.getDevices(WebCL.DEVICE_TYPE_GPU);
+    var platDevices = platform.getDevices(currentDevice);
     if(platDevices.length === 0) {
         alert("No devices available");
         return false;
@@ -230,7 +231,7 @@ function runCL(){
     }
 
     time = new Date().getTime();
-    setInterval(fr, 500);
+    frTimer = setInterval(fr, 500);
     anim();
     } catch (e){
       throw e;
@@ -238,7 +239,7 @@ function runCL(){
 
 }
 
-function createProperContext(device)
+function createProperContext()
 {
   try {
     if (interop) {
@@ -248,12 +249,12 @@ function createProperContext(device)
           alert("Not using GL interoperability");
           interop = false;
       }
-      var contextProperties = {platform: platform, devices: device,
-                             deviceType: WebCL.DEVICE_TYPE_ALL, shareGroup: 1, hint: null};
+      var contextProperties = {platform: platform, devices: [device],
+                             deviceType: currentDevice, shareGroup: 1, hint: null};
       context = extension.createContext(contextProperties);
     } else {
-      var contextProperties = {platform: platform, devices: device,
-                             deviceType: WebCL.DEVICE_TYPE_ALL, shareGroup: 0, hint: null};
+      var contextProperties = {platform: platform, devices: [device],
+                             deviceType: currentDevice, shareGroup: 0, hint: null};
       context = WebCL.createContext(contextProperties);
     }
   } catch (e){
@@ -285,7 +286,7 @@ function prepareKernel(){
     // dictionary has channelType as second parameter instead of channelDataType,
     // but if we use it we got INVALID_IMAGE_FORMAT_DESCRIPTOR error.
 
-    var descriptor = {channelOrder:WebCL.RG, channelDataType:types.FLOAT,
+    var descriptor = {channelOrder:WebCL.RGBA, channelDataType:types.FLOAT,
                       width:4, height:n, rowPitch:0};
     iPath  = context.createImage(WebCL.MEM_READ_WRITE, descriptor);
     iPath1 = context.createImage(WebCL.MEM_READ_WRITE, descriptor);
@@ -358,6 +359,7 @@ function prepareCommandQueue(){
 }
 
 var globalWorkSize = new Int32Array([4,n]);
+
 function draw(){
   for ( var i = 0; i < it;  i++ ){
    kPath.setArg(0, iPath);
@@ -376,6 +378,7 @@ function draw(){
   drawPix();
   frames++;
 }
+
 function drawPix(){
   try {
     if(interop) {
@@ -411,6 +414,7 @@ function drawPix(){
       alert("Drawpix error = " + e.message);
   }
 }
+
 function anim(){
    draw();
    switch ( animation ){
@@ -425,6 +429,7 @@ function anim(){
        break;
    }
 }
+
 function run(v) {
   if( animation == "animate" ){
     animation = "stop";
@@ -435,6 +440,7 @@ function run(v) {
     anim();
   }
 }
+
 function reset() {
   if( animation == "stop" ){
     animation = "reset";
@@ -442,23 +448,28 @@ function reset() {
     anim();}
   else animation = "reset";
 }
+
 function setDelay(val) {
   delay = parseInt(val);
 }
-function fr(){
+
+function fr() {
   var ti = new Date().getTime();
   var fps = Math.round(1000*frames/(ti - time));
   // FIXME: Sometimes we have a division per 0, avoiding it...
   document.getElementById("framerate").value = isNaN(fps) ? 0 : fps;
   frames = 0;  time = ti;
 }
-function setGa(v){
+
+function setGa(v) {
   var g = v.valueOf();
   kPath.setKernelArg(4, g, types.FLOAT);
 }
+
 function setIt(val) {
   it = parseInt(val);
 }
+
 function setPlane(s) {
   switch (s){
     case "xy": kPix = kPixXY;   break;
@@ -468,8 +479,8 @@ function setPlane(s) {
   drawPix();
 }
 
-function runInterop()
-{
+function runInterop() {
+  window.clearInterval(frTimer);
   if (interop == false) {
     interop = true;
     document.getElementById('interopBtn').value = "Disable CL/GL Interoperability";
@@ -480,6 +491,10 @@ function runInterop()
   runCL();
 }
 
+function resetCL() {
+  window.clearInterval(frTimer);
+  CL_start();
+}
 </script>
 <style type="text/css">
   H1{ font-size: 120%; color: green}
@@ -497,9 +512,13 @@ function runInterop()
 It<input size="3" value="10" onchange="setIt( this.value )">
 delay<input size="3" value="0" onchange="setDelay( this.value )">
 fps<input size="5" id="framerate">
-plane:
+<br>
+Plane:
 <input type="radio" name="p" onchange="setPlane( this.value )" value="xy" checked >xy
 <input type="radio" name="p" onchange="setPlane( this.value )" value="xt">xt
 <input type="radio" name="p" onchange="setPlane( this.value )" value="yt">yt
-
+<br>
+Device:
+<input type="radio" name="r2" id="CPU" onclick="useGpu=false;resetCL()">CPU
+<input type="radio" name="r2" id="GPU" onclick="useGpu=true;resetCL()" checked="true">GPU
 </body></html>
