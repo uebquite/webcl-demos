@@ -7,6 +7,7 @@
 <title>The Mandelbrot set explorer</title>
 
 <script src="../common/gl.js" type="text/javascript"></script>
+<script src="../common/webcl.js" type="text/javascript"></script>
 
 <script id="clProgramMandelbrot" type="text/x-opencl">
 
@@ -203,7 +204,7 @@ function getKernel(id) {
 var ctx_c, imgd, scale = .01, zoom = 1.01, zoom2 = 1.05,
     Ro = .37014983130958534, Io = .10511722270082503, dR = -Ro, dI = -Io,
     animation = "animate", time, frames = 0, delay = 0;
-var program, kernel, cmdQueue, bufCol, outBuffer, bufSize;
+var program, kernel, cmdQueue, bufCol, outBuffer, bufSize, frTimer, useGPU = true;
 var globalWS = new Int32Array(2);
 
 function CL_mandelbrot () {
@@ -217,31 +218,16 @@ function CL_mandelbrot () {
 
   bufSize = 4 * nx * ny;
 
+  var kernelSrc = getKernel("clProgramMandelbrot");
+
   try {
-    if (typeof(webcl) === undefined) {
-      alert("Unfortunately your system does not support WebCL");
-      return false;
-    }
-    var platforms = webcl.getPlatforms();
-    var platform = platforms[0];
-    var devices = platform.getDevices(webcl.DEVICE_TYPE_GPU);
-    var device = devices[0];
-    var contextProperties = {platform: platform, devices: devices, deviceType: webcl.DEVICE_TYPE_GPU, shareGroup: 1, hint: null};
-    var ctx = webcl.createContext(contextProperties);
 
-    var kernelSrc = getKernel("clProgramMandelbrot");
-    program = ctx.createProgram(kernelSrc);
+    WebCLCommon.init(useGPU ? "GPU" : "CPU");
 
-    try {
-      program.build(devices);
-    } catch(e) {
-      alert ("Failed to build WebCL program. Error "
-        + program.getBuildInfo(device,
-          webcl.PROGRAM_BUILD_STATUS)
-        + ":  " + program.getBuildInfo (device,
-          webcl.PROGRAM_BUILD_LOG));
-      throw e;
-    }
+    var ctx = WebCLCommon.createContext();
+    var program = WebCLCommon.createProgramBuild(kernelSrc);
+    cmdQueue = WebCLCommon.createCommandQueue();
+
     bufCol = ctx.createBuffer(webcl.MEM_WRITE_ONLY, bufSize);
     kernel = program.createKernel("ckManZ2sm");
 
@@ -250,17 +236,15 @@ function CL_mandelbrot () {
 
     kernel.setArg (0, bufCol);
 
-    cmdQueue = ctx.createCommandQueue(device);
-
     outBuffer = new Uint8Array(Uint8Array.BYTES_PER_ELEMENT * bufSize);
 
   } catch(e) {
-    console.error("ERROR: " + e.message);
+    console.error("ERROR: " + e.message, e);
     throw e;
   }
 
   time = new Date().getTime();
-  setInterval(fr, 500);
+  frTimer = setInterval(fr, 500);
   anim();
 
   function ev_mouseup (ev) {
@@ -337,6 +321,13 @@ function fr(){
   document.getElementById("framerate").value = fps;
   frames = 0;  time = ti;
 }
+
+function toogleDevice(device) {
+    window.clearInterval(frTimer);
+    useGPU = (device == 'CPU') ? false : true;
+    CL_mandelbrot();
+}
+
 </script>
 <style type="text/css">
   H1{ font-size: 120%; color: green}
@@ -365,4 +356,8 @@ formula<select onchange="setFormula(this.options[this.selectedIndex].value)">
    <option value="ckManZ4">z^4
    <option value="ckMakin">Makin
    </select>
+GPU<input type="radio" name="device" id="GPUradio" onclick="toogleDevice('GPU')" checked="true">
+CPU<input type="radio" name="device" id="CPUradio" onclick="toogleDevice('CPU')">
+
+
 </body></html>
