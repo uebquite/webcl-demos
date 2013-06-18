@@ -74,9 +74,6 @@ function initWebCL() {
   output.innerHTML = "";
 
   try {
-
-    var deviceType = useGPU ? webcl.DEVICE_TYPE_GPU : webcl.DEVICE_TYPE_CPU;
-
     WebCLCommon.init(useGPU ? "GPU" : "CPU");
     var ctx = WebCLCommon.createContext();
     var program = WebCLCommon.createProgramBuild(kernelSrc);
