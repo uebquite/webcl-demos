@@ -109,7 +109,8 @@ function loadKernel ( id ){
 }
 
 var T = .02, n = 512, n2 = n/2,  it = 100, bufSize = 4*n*n, ev,
-    ctx_c, frames = 0, animation = "animate", time, delay = 0, randByteLength = 4*n*n2;
+    ctx_c, frames = 0, animation = "animate", time, delay = 0, randByteLength = 4*n*n2,
+    useGPU = true, kernelSrc, frTimer;
 
 var kSpinB, kSpinW, kPix, cmdQueue, iSpinB, iSpinB1, iSpinW, iSpinW1,
     bufPix, outBuffer, iTemp, spin;
@@ -119,12 +120,14 @@ var PIX_GLOBAL_SIZE = new Int32Array([n, n]);
 var IMAGE_ORIGIN = new Int32Array([0, 0, 0]);
 var IMAGE_REGION = new Int32Array([n, n2, 1]);
 
-function CL_rand () {
+function initWebCL () {
   try {
 
-    var kernelSrc = loadKernel("clXY");
+    if (!kernelSrc) {
+        kernelSrc = loadKernel("clXY");
+    }
 
-    WebCLCommon.init("ALL");
+    WebCLCommon.init(useGPU ? "GPU" : "CPU");
     var ctx = WebCLCommon.createContext();
     var program = WebCLCommon.createProgramBuild(kernelSrc);
     cmdQueue = WebCLCommon.createCommandQueue();
@@ -168,10 +171,9 @@ function CL_rand () {
   var canvas = document.getElementById("c");
   init_gl(canvas);
   time = new Date().getTime();
-  setInterval(fr, 500);
+  frTimer = setInterval(fr, 500);
   anim();
 }
-
 
 function randomSpin() {
 
@@ -292,13 +294,20 @@ function setT(v){
 function setIt(val) {
   it = parseInt(val);
 }
+
+function toogleDevice(device) {
+    window.clearInterval(frTimer);
+    useGPU = (device == 'CPU') ? false : true;
+    initWebCL();
+}
+
 </script>
 <style type="text/css">
   H1{ font-size: 120%; color: green}
   H2{ font-size: 100%; color: green}
   pre{ color: darkblue}
 </style>
-</head><body onload="CL_rand ()">
+</head><body onload="initWebCL()">
 
 <h1>XY model. Modified chess-board algorithm</h1>
 
@@ -310,6 +319,9 @@ T<input size="4" value="0.02" onchange="setT( this.value )">
 It<input size="1" value="100" onchange="setIt( this.value )">
 delay<input size="2" value="0" onchange="setDelay( this.value )">
 fps<input size="2" id="framerate">
+
+GPU<input type="radio" name="device" id="GPUradio" onclick="toogleDevice('GPU')" checked="true">
+CPU<input type="radio" name="device" id="CPUradio" onclick="toogleDevice('CPU')">
 
 <p>GPU based Monte-Carlo simulation of the XY model on the square 512&times;512
 grid. <i>it</i> is the number of MC iterations per frame.
