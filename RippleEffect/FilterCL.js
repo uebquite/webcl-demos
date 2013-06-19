@@ -26,6 +26,7 @@ var isCLActive = false;                     // prevent requeuing while still act
 
 function initCL() {
     try {
+
         cl = webcl;
         if (cl === null) {
             console.error("Your browser doesn't support WebCL");
@@ -36,6 +37,8 @@ function initCL() {
         var ctxProperties;
         var kernelSource;
 
+        var deviceType = useGPU ? cl.DEVICE_TYPE_GPU : cl.DEVICE_TYPE_CPU;
+
         platforms = cl.getPlatforms();
         if (platforms.length === 0) {
             console.error("No platforms available");
@@ -43,17 +46,19 @@ function initCL() {
         }
 
         platform = platforms[0];
-        devices = platform.getDevices();
+        devices = platform.getDevices(deviceType);
         if (devices.length === 0) {
             console.error("No devices available");
             return false;
         }
 
         device = devices[0];
-        ctxProperties = {platform: platform, device: device,
-            deviceType: cl.DEVICE_TYPE_GPU, hints: null};
+
+        ctxProperties = {platform: platform, devices: devices,
+            deviceType: deviceType, shareGroup: 0, hints: null};
 
         context = cl.createContext(ctxProperties);
+
         // Create a command queue
         //
         queue = context.createCommandQueue(device);
@@ -68,7 +73,7 @@ function initCL() {
 
         filterProgram = context.createProgram(kernelSource);
     } catch (e) {
-        console.error(e.message);
+        console.error(e.message, e);
         return false;
     }
 
@@ -155,7 +160,7 @@ function runRippleCL(t, cx, cy, diag) {
     localThreads[1] = blockSizeY;
 
     tStart = new Date().valueOf();
-    queue.enqueueNDRangeKernel(filterKernel, 0, globalThreads, localThreads);
+    queue.enqueueNDRangeKernel(filterKernel, 0, globalThreads, null);
 
     // Wait for the command queue to get serviced before reading back results
     //
