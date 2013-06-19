@@ -12,6 +12,7 @@ var tEnd;                                   // end filter timestamp
 var isRunning   = null;
 var useJS       = null;
 var isCLenabled = false;
+var useGPU      = true;
 
 var t = 0;
 var cx = 0;
@@ -93,6 +94,7 @@ function loadComplete() {
 
     var b1 = new FastButton(document.getElementById("run"),    toggleRunning);
     var b2 = new FastButton(document.getElementById("filter"), toggleFilter);
+    var b3 = new FastButton(document.getElementById("toggleDevice"), toggleDevice);
 
     isRunning = false;
     isCLenabled = initCL();
@@ -100,7 +102,6 @@ function loadComplete() {
 
     showRunState();
     showFilterState();
-    hideResults();
 }
 
 function onMouseMove (e) {
@@ -132,9 +133,16 @@ function toggleRunning() {
 
     if (isRunning) {
         requestAnimFrame(runFilter);
-    } else {
-        hideResults();
     }
+}
+
+function toggleDevice() {
+    if (!useJS) {
+        useGPU = !useGPU;
+        showFilterState();
+        initCL();
+        requestAnimFrame(runFilter);
+        }
 }
 
 function showRunState() {
@@ -146,11 +154,13 @@ function toggleFilter() {
         return;
 
     useJS = !useJS;
+    useGPU = useJS ? false : useGPU;
     showFilterState();
 }
 
 function showFilterState() {
     document.getElementById("filter").firstChild.nodeValue = useJS ? "JavaScript" : "WebCL";
+    document.getElementById("toggleDevice").firstChild.nodeValue = useGPU ? "GPU" : "CPU";
 }
 
 function runFilter() {
