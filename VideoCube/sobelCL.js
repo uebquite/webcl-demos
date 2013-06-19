@@ -35,71 +35,31 @@ var types = WebCLKernelArgumentTypes;
 function InitCL(useGpu)
 {
     try {
-        cl = webcl;
-
-        if(cl === undefined) {
-            console.error("Unfortunately your system does not support WebCL");
-            return null;
-        }
-
-        // Select a compute device
-        //
-        platform_ids = cl.getPlatforms();
-        if(platform_ids.length === 0) {
-            console.error("No platforms available");
-            return null;
-        }
-
-        platform_id = platform_ids[0];
-
-        // Select a compute device
-        //
-
-        device_ids = platform_id.getDevices(useGpu ? cl.DEVICE_TYPE_GPU : cl.DEVICE_TYPE_CPU);
-        if(device_ids.length === 0) {
-            console.error("No devices available");
-            return null;
-        }
-
-        device_id = device_ids[0];
-
-        // Create a compute context
-        //
-        var contextProperties = {platform: platform_id, devices: [device_id],
-                                deviceType: cl.DEVICE_TYPE_ALL, shareGroup: 0, hint: null};
-        context = cl.createContext(contextProperties);
-
-        // Create a command queue
-        //
-        queue = context.createCommandQueue(device_id);
 
         // Create the compute program from the source buffer
         //
         var kernelSource = getKernel("sobel_filter");
+        var deviceType = useGpu ? "GPU" : "CPU";
+        
         if (kernelSource === null) {
             console.error("No kernel named: " + "sobel_filter");
             return null;
         }
 
-        program = context.createProgram(kernelSource);
-
-        // Build the program executable
-        //
-        try {
-            program.build(device_id);
-        } catch(e) {
-            console.error("Failed to build WebCL program. Error " +
-            program.getBuildInfo(device_id,cl.PROGRAM_BUILD_STATUS) +
-            + ":  "
-            + program.getBuildInfo(device_id,cl.PROGRAM_BUILD_LOG));
-            throw e;
-        }
+        
+        
+        WebCLCommon.init(deviceType);
+        device_ids = WebCLCommon.getDevices(deviceType);
+        device_id = device_ids[0];
+        context = WebCLCommon.createContext();
+        program = WebCLCommon.createProgramBuild(kernelSource);
+        queue = WebCLCommon.createCommandQueue();
 
         // Create the compute kernel in the program we wish to run
         //
         kernel = program.createKernel("sobel_filter");
 
-        return cl;
+        return webcl;
 
     } catch (e) {
         console.error("Error on InitWebCL = " + e.message);
