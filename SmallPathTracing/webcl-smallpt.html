@@ -28,8 +28,12 @@
                 <h1>WebCL SmallptGPU</h1>
             </header>
                 <canvas id="canvas" width="640" height="480" style="position:relative; left=0px; width=50%"></canvas>
-                <button type="button" onclick="reset()">Reset</button>
-                <button type="button" id="stop" onclick="stop()">Stop</button>
+                <div>
+                  <button type="button" onclick="reset()">Reset</button>
+                  <button type="button" id="stop" onclick="stop()">Stop</button>
+                  GPU<input type="radio" name="device" id="GPUradio" onclick="toogleDevice('GPU')" checked="true">
+                  CPU<input type="radio" name="device" id="CPUradio" onclick="toogleDevice('CPU')">
+                </div>
                 <p>Canvas resolution:</p>
                 <select id="resolution" onchange="resolutionChanged(this.selectedIndex)">
                 <option>320x240</option>

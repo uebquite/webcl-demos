@@ -44,6 +44,8 @@ var prevTime = 0;
 
 var running = true;
 
+var useGPU = true;
+
 function xhrLoad(uri) {
     var xhr = new XMLHttpRequest();
     xhr.open("GET", uri, false);
@@ -64,6 +66,11 @@ requestAnimationFrame = window.requestAnimationFrame ||
 
 
 var start = window.mozAnimationStartTime;  // Only supported in FF. Other browsers can use something like Date.now(). 
+
+function toogleDevice(device) {
+    useGPU = (device == 'CPU') ? false : true;
+    initWebCL();
+}
 
 function initPathTracing() {
     initUI();
@@ -366,7 +373,8 @@ function releaseBuffers() {
         clKernel = 0;
         cl = 0;
     }
-}
+}    
+
 
 function allocateBuffers() {
     // "sizeof(Sphere)"
@@ -414,7 +422,7 @@ function clDeviceQuery() {
   var platforms = (window.webcl && webcl.getPlatforms()) || [];
   for (var p = 0, i = 0; p < platforms.length; p++) {
     var plat = platforms[p];
-    var devices = plat.getDevices(webcl.DEVICE_TYPE_GPU);
+    var devices = plat.getDevices(useGPU ? webcl.DEVICE_TYPE_GPU : webcl.DEVICE_TYPE_CPU);
     for (var d = 0; d < devices.length; d++, i++) {
       if (devices[d].getInfo(webcl.DEVICE_AVAILABLE) === true) {
         var availableDevice = { 'device' : devices[d],
@@ -443,7 +451,7 @@ function initWebCL() {
         var deviceType = deviceList[selected].type;
 
         var contextProperties = {platform: selectedPlatform,
-                                    device: selectedDevice,
+                                    devices: [selectedDevice],
                                     deviceType: deviceType, shareGroup: 0,
                                     hint: null};
 
