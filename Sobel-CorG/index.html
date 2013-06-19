@@ -2,6 +2,7 @@
 <head>
 <title>WebCL Sobel Filter</title>
 <meta http-equiv="CACHE-CONTROL" content="NO-CACHE">
+<script src="../common/webcl.js" type="text/javascript"></script>
 
 <style type="text/css">
 .info {
@@ -92,10 +93,6 @@ var blockSizeX;
 var blockSizeY;
 
 var cl;                             // OpenCL context
-var platform_ids;                   // array of OpenCL platform ids
-var platform_id;                    // OpenCL platform id
-var device_ids;                     // array of OpenCL device ids
-var device_id;                      // OpenCL device id
 var context;                        // OpenCL context
 var queue;                          // OpenCL command queue
 var program;                        // OpenCL program
@@ -122,38 +119,8 @@ function InitWebCL()
    try{
       cl = webcl;
 
-      if(cl === null) {
-         alert("Unfortunately your system does not support WebCL");
-         return;
-      }
-
-      // Select a compute device
-      //
-      platform_ids = cl.getPlatforms();
-      if(platform_ids.length === 0) {
-         alert("No platforms available");
-         return;
-      }
-      platform_id = platform_ids[0];
-
-      // Select a compute device
-      //
-      device_ids = platform_id.getDevices(useGPU ? cl.DEVICE_TYPE_GPU : cl.DEVICE_TYPE_CPU);
-      if(device_ids.length === 0) {
-         alert("No devices available");
-         return;
-      }
-      device_id = device_ids[0];
-
-      // Create a compute context
-      //
-      var contextProperties = {platform: platform_id, devices: [device_id],
-                              deviceType: cl.DEVICE_TYPE_ALL, shareGroup: 0, hint: null};
-      context = cl.createContext(contextProperties);
-
-      // Create a command queue
-      //
-      queue = context.createCommandQueue(device_id);
+      WebCLCommon.init(useGPU ? "GPU" : "CPU");
+      context = WebCLCommon.createContext();
 
       // Create the compute program from the source buffer
       //
@@ -163,19 +130,8 @@ function InitWebCL()
          return;
       }
 
-      program = context.createProgram(kernelSource);
-
-      // Build the program executable
-      //
-      try {
-         program.build(device_id);
-      } catch(e) {
-         alert ("Failed to build WebCL program. Error " +
-         program.getBuildInfo(device_id,cl.PROGRAM_BUILD_STATUS) +
-         + ":  "
-         + program.getBuildInfo(device_id,cl.PROGRAM_BUILD_LOG));
-         throw e;
-      }
+      program = WebCLCommon.createProgramBuild(kernelSource);
+      queue = WebCLCommon.createCommandQueue();
 
       // Create the compute kernel in the program we wish to run
       //
@@ -269,7 +225,8 @@ function RunWebCLFilter()
 
       // Get the maximum work group size for executing the kernel on the device
       //
-      var maxWorkGroupSize = kernel.getWorkGroupInfo(device_id, cl.KERNEL_WORK_GROUP_SIZE);
+      var devices = WebCLCommon.getDevices(useGPU ? "GPU" : "CPU");
+      var maxWorkGroupSize = kernel.getWorkGroupInfo(devices[0], cl.KERNEL_WORK_GROUP_SIZE);
       console.log("maxWorkGroupSize: " + maxWorkGroupSize);
 
       blockSizeY = 1;

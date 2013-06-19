@@ -34,7 +34,7 @@ window.WebCLCommon = (function(debug){
 
         try {
             for (var i=0; i<platforms.length; i++) {
-                addElementsFormList(platform[i].getDevices(type), deviceList);
+                addElementsFromList(platforms[i].getDevices(type), deviceList);
             }
         } catch(e) {
             if (debug) console.error(e);
