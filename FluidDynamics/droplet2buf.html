@@ -6,6 +6,7 @@
 <TITLE>2d ink droplet. Buffers</TITLE>
 
 <script src="../common/gl.js" type="text/javascript"></script>
+<script src="../common/webcl.js" type="text/javascript"></script>
 
 <script id="clProgram" type="text/x-opencl">
 
@@ -91,42 +92,13 @@ function CL_prog() {
   var output = document.getElementById("output");
   output.innerHTML = "";
   try {
-    if (window.WebCL == undefined) {
-      alert("Unfortunately your system does not support WebCL");
-      return false;
-    }
-    var platforms = WebCL.getPlatforms();
-    if(platforms.length === 0) {
-        alert("No platforms available");
-        return false;
-    }
 
-    var platform = platforms[0];
-
-    currentDevice = useGpu ? WebCL.DEVICE_TYPE_GPU : WebCL.DEVICE_TYPE_CPU;
-    var platDevices = platform.getDevices(currentDevice);
-    if(platDevices.length === 0) {
-        alert("No devices available");
-        return false;
-    }
-
-    var device = platDevices[0];
-    var contextProperties = {platform: platform, devices: [device],
-                             deviceType: currentDevice, shareGroup: 0, hint: null};
-
-    var context = WebCL.createContext(contextProperties);
-
+    WebCLCommon.init(useGpu ? "GPU" : "CPU");
+    var context = WebCLCommon.createContext();
     var kernelSrc = loadKernel("clProgram");
-    var program = context.createProgram(kernelSrc);
-    try {
-      program.build (device);
-    } catch(e) {
-      alert ("Failed to build WebCL program. Error " +
-        program.getBuildInfo(device,WebCL.PROGRAM_BUILD_STATUS) +
-        + ":  "
-        + program.getBuildInfo(device,WebCL.PROGRAM_BUILD_LOG));
-      throw e;
-    }
+    var program = WebCLCommon.createProgramBuild(kernelSrc);
+    cmdQueue = WebCLCommon.createCommandQueue();
+
     D  = context.createBuffer(WebCL.MEM_READ_WRITE, bufferSize);
     D1 = context.createBuffer(WebCL.MEM_READ_WRITE, bufferSize);
     P  = context.createBuffer(WebCL.MEM_READ_WRITE, bufferSize);
@@ -147,8 +119,6 @@ function CL_prog() {
     kP = program.createKernel("kP");
     kP.setArg(1, G);
     kDiv = program.createKernel("kDiv");
-
-    cmdQueue = context.createCommandQueue(device);
 
     var inkDensity = new Float32Array( n*n );
     var t = 0, h = 1/n, d;
