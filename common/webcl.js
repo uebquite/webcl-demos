@@ -18,6 +18,7 @@ window.WebCLCommon = (function(debug){
     var NO_WEBCL_FOUND = "Unfortunately your system does not support WebCL";
     var NO_PLATFORM_FOUND = "No WebCL platform found in your system";
     var NO_DEVICE_FOUND = "No WebCL device found in your system";
+    var EXTENSION_NOT_SUPPORTED = "Extension is not supported";
     var INVALID_SEQUENCE = "Context is null, you must create a context " +
     		"before call createWebCLProgram";
 
@@ -123,16 +124,30 @@ window.WebCLCommon = (function(debug){
          */
         createContext : function(props){
             var ctxProps = {};
+            var resource;
+            var extension;
 
             /* Populate ctxProps with default values */
             ctxProps.platform = (props && props.platform) ? props.platform : platforms[0];
             ctxProps.devices = (props && props.devices) ? props.devices : [devices[0]];
             ctxProps.deviceType = (props && props.deviceType) ? props.deviceType :  webcl.DEVICE_TYPE_GPU;
-            ctxProps.shareGroup = (props && props.shareGroup) ? props.shareGroup : 0;
             ctxProps.hint = (props && props.hint) ? props.hint : null;
 
+            /* Checking for possible extensions*/
+            resource = (props && props.extension) ? props.extension : null;
+
             try {
-                context = webcl.createContext(ctxProps);
+                if(resource) {
+                    ctxProps.shareGroup = (props && props.shareGroup) ? props.shareGroup : 1;
+                    extension = webcl.getExtension(resource);
+                    if(!extension) {
+                        throw new Error(EXTENSION_NOT_SUPPORTED);
+                    }
+                    context = extension.createContext(ctxProps);
+                } else {
+                    ctxProps.shareGroup = (props && props.shareGroup) ? props.shareGroup : 0;
+                    context = webcl.createContext(ctxProps);
+                }
             } catch (e) {
                 if (debug) console.error(e);
                 throw e;

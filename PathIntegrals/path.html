@@ -4,6 +4,7 @@
 
 <html><head>
 <TITLE>Path Integrals</TITLE>
+<script src="../common/webcl.js" type="text/javascript"></script>
 
 <script id="clProg" type="text/x-opencl">
 
@@ -165,8 +166,8 @@ function loadKernel ( id ){
 var gl;
 var ctx_c, n = 1024, it = 10, ev, bufferSize = 4*4*n,
     frames = 0, animation = "animate", time, delay = 0,
-    interop = false, useGpu = true, currentDevice;
-var program, device,kernelSrc, platform, frTimer;
+    interop = true, useGpu = true;
+var program, kernelSrc, frTimer;
 var kPath, kPix, kPixXY, kPixXT, kPixYT, cmdQueue, iPath, iPath1,
     bufPix, outBuffer, bufRand, context = null;
 var types = WebCLKernelArgumentTypes;
@@ -185,22 +186,7 @@ function CL_start() {
       return false;
     }
 
-    var platforms = WebCL.getPlatforms();
-    if(platforms.length === 0) {
-        alert("No platforms available");
-        return false;
-    }
-
-    platform = platforms[0];
-    currentDevice = useGpu ? WebCL.DEVICE_TYPE_GPU : WebCL.DEVICE_TYPE_CPU;
-
-    var platDevices = platform.getDevices(currentDevice);
-    if(platDevices.length === 0) {
-        alert("No devices available");
-        return false;
-    }
-
-    device = platDevices[0];
+    WebCLCommon.init(useGpu ? "GPU" : "CPU");
 
     runCL();
 
@@ -242,21 +228,13 @@ function runCL(){
 function createProperContext()
 {
   try {
+    var contextProperties;
     if (interop) {
-      var extension = null;
-      extension = WebCL.getExtension("KHR_GL_SHARING");
-      if (!extension) {
-          alert("Not using GL interoperability");
-          interop = false;
-      }
-      var contextProperties = {platform: platform, devices: [device],
-                             deviceType: currentDevice, shareGroup: 1, hint: null};
-      context = extension.createContext(contextProperties);
-    } else {
-      var contextProperties = {platform: platform, devices: [device],
-                             deviceType: currentDevice, shareGroup: 0, hint: null};
-      context = WebCL.createContext(contextProperties);
+      contextProperties = {extension: "KHR_GL_SHARING"};
     }
+
+    context = WebCLCommon.createContext(contextProperties);
+
   } catch (e){
     throw e;
   }
@@ -267,16 +245,7 @@ function createProperContext()
 function buildProgram()
 {
   kernelSrc = loadKernel("clProg");
-  program = context.createProgram(kernelSrc);
-  try {
-    program.build (device);
-  } catch(e) {
-    alert ("Failed to build WebCL program. Error " +
-      program.getBuildInfo(device,WebCL.PROGRAM_BUILD_STATUS) +
-      + ":  "
-      + program.getBuildInfo(device,WebCL.PROGRAM_BUILD_LOG));
-    throw e;
-  }
+  program = WebCLCommon.createProgramBuild(kernelSrc);
 }
 
 function prepareKernel(){
@@ -349,7 +318,7 @@ function initPaths(queue, pathA, pathB){
 
 function prepareCommandQueue(){
   try {
-    cmdQueue = context.createCommandQueue (device, 0);
+    cmdQueue = WebCLCommon.createCommandQueue();
     initPaths(cmdQueue, iPath, iPath1);
     var UIRandom = createUIRandom();
     ev = cmdQueue.enqueueWriteBuffer(bufRand, true, 0, bufferSize, UIRandom);
