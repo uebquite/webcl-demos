@@ -27,41 +27,11 @@ var isCLActive = false;                     // prevent requeuing while still act
 function initCL() {
     try {
 
-        cl = webcl;
-        if (cl === null) {
-            console.error("Your browser doesn't support WebCL");
-            return false;
-        }
-
         var maxWorkGroupSize;
-        var ctxProperties;
         var kernelSource;
+        var deviceType = useGPU ? "GPU" : "CPU";
 
-        var deviceType = useGPU ? cl.DEVICE_TYPE_GPU : cl.DEVICE_TYPE_CPU;
-
-        platforms = cl.getPlatforms();
-        if (platforms.length === 0) {
-            console.error("No platforms available");
-            return false;
-        }
-
-        platform = platforms[0];
-        devices = platform.getDevices(deviceType);
-        if (devices.length === 0) {
-            console.error("No devices available");
-            return false;
-        }
-
-        device = devices[0];
-
-        ctxProperties = {platform: platform, devices: devices,
-            deviceType: deviceType, shareGroup: 0, hints: null};
-
-        context = cl.createContext(ctxProperties);
-
-        // Create a command queue
-        //
-        queue = context.createCommandQueue(device);
+        cl = webcl;
 
         // Create the compute program from the source buffer
         //
@@ -71,17 +41,23 @@ function initCL() {
             return false;
         }
 
-        filterProgram = context.createProgram(kernelSource);
+        WebCLCommon.init(deviceType);
+        context = WebCLCommon.createContext();
+        filterProgram = WebCLCommon.createProgramBuild(kernelSource);
+
+        queue = context.createCommandQueue();
+
     } catch (e) {
         console.error(e.message, e);
         return false;
     }
 
     try {
-        filterProgram.build(device);
         filterKernel = filterProgram.createKernel("Ripple_kernel");
 
-        maxWorkGroupSize = filterKernel.getWorkGroupInfo(device, cl.KERNEL_WORK_GROUP_SIZE);
+        devices = WebCLCommon.getDevices(deviceType);
+
+        maxWorkGroupSize = filterKernel.getWorkGroupInfo(devices[0], cl.KERNEL_WORK_GROUP_SIZE);
 
         while (blockSizeX * blockSizeY > maxWorkGroupSize) {
             blockSizeX = blockSizeX / 2;
@@ -94,7 +70,7 @@ function initCL() {
         nBytes = nRGBAvals * Float32Array.BYTES_PER_ELEMENT;
 
     } catch (e) {
-        console.error("ERROR: "+e.message);
+        console.error("ERROR: "+e.message, e);
         return false;
     }
 
