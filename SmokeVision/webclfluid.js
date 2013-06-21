@@ -121,12 +121,6 @@ function webclfluid() {
 
     viewer = new Viewer(gl, shaderProgram, scalarField);
 
-    // Set up WebCL
-    if(window.webcl == undefined) {
-        alert("Your browser doesn't support WebCL");
-        return false;
-    }
-
     scalarSrc = getKernel("scalar_kernels.cl");
     vectorSrc = getKernel("vector_kernels.cl");
 
@@ -257,7 +251,9 @@ function step() {
 
 function clDeviceQuery() {
   var deviceList = [];
-  var platforms = (window.webcl && webcl.getPlatforms()) || [];
+
+  var platforms = (WebCLCommon.getPlatforms());
+
   for (var p=0; p < platforms.length; p++) {
     var plat = platforms[p];
     var devices = [];
@@ -283,6 +279,7 @@ function clDeviceQuery() {
 
 function setupWebCL() {
 
+  WebCLCommon.init("ALL");
   var deviceList = clDeviceQuery();
 
   if (deviceList.length === 0) {
@@ -302,11 +299,13 @@ function setupWebCL() {
 
         var selectedDevice = deviceList[selected].device;
         var selectedPlatform = deviceList[selected].platform;
-        var selectedDeviceType = deviceList[selected].type;
-        var ctxProps = {platform: selectedPlatform, devices: [selectedDevice],
-                selectedDevice: selectedDeviceType, shareGroup: 1, hint: null};
-        cl = webcl.createContext(ctxProps);
-        clQueue = cl.createCommandQueue(selectedDevice, null);
+
+        var ctxProps = {platform: selectedPlatform,
+                        devices: [selectedDevice]};
+
+        cl = WebCLCommon.createContext(ctxProps);
+        clQueue = WebCLCommon.createCommandQueue(selectedDevice);
+
         allocateBuffers();
     } catch(err) {
     console.log(err);
@@ -315,41 +314,31 @@ function setupWebCL() {
     }
 
     try {
-        scalarProgram = cl.createProgram(scalarSrc);
-        var program = scalarProgram;
+        scalarProgram = WebCLCommon.createProgramBuild(scalarSrc, [selectedDevice]);
+        vectorProgram = WebCLCommon.createProgramBuild(vectorSrc, [selectedDevice]);
 
-        program.build([selectedDevice]);
+        scalarAddKernel = scalarProgram.createKernel("scalarAddField");
+        scalarCopyKernel = scalarProgram.createKernel("scalarCopy");
+        scalarDiffusionKernel = scalarProgram.createKernel("scalarDiffusion");
+        scalarAdvectionKernel = scalarProgram.createKernel("scalarAdvection");
+        scalarBoundariesKernel = scalarProgram.createKernel("scalarBoundaryDensities");
+        volumeRayMarchingKernel = scalarProgram.createKernel("volumeRayMarching");
 
-        vectorProgram = cl.createProgram(vectorSrc);
-
-        program = vectorProgram;
-        program.build([selectedDevice]);
+        vectorAddKernel = vectorProgram.createKernel("vectorAddField");
+        vectorCopyKernel = vectorProgram.createKernel("vectorCopy");
+        vectorAdvectionKernel = vectorProgram.createKernel("vectorAdvection");
+        vectorDiffusionKernel = vectorProgram.createKernel("vectorDiffusion");
+        vectorInitFieldKernel = vectorProgram.createKernel("vectorInitField");
+        vectorBoundariesKernel = vectorProgram.createKernel("vectorBoundaries");
+        vectorProjectionFirst = vectorProgram.createKernel("vectorProjectionFirst");
+        vectorProjectionSecond = vectorProgram.createKernel("vectorProjectionSecond");
+        vectorProjectionThird = vectorProgram.createKernel("vectorProjectionThird");
+        vectorVorticityFirstKernel = vectorProgram.createKernel("vectorVorticityConfinementFirst");
+        vectorVorticitySecondKernel = vectorProgram.createKernel("vectorVorticityConfinementSecond");
     } catch(e) {
-        console.log(e);
-        console.log("Failed to build WebCL program. Error " +
-          program.getBuildInfo(selectedDevice, webcl.PROGRAM_BUILD_STATUS) + ":  " +
-          program.getBuildInfo(selectedDevice, webcl.PROGRAM_BUILD_LOG));
-    return false;
+        console.error(e);
+        return false;
     }
-
-    scalarAddKernel = scalarProgram.createKernel("scalarAddField");
-    scalarCopyKernel = scalarProgram.createKernel("scalarCopy");
-    scalarDiffusionKernel = scalarProgram.createKernel("scalarDiffusion");
-    scalarAdvectionKernel = scalarProgram.createKernel("scalarAdvection");
-    scalarBoundariesKernel = scalarProgram.createKernel("scalarBoundaryDensities");
-    volumeRayMarchingKernel = scalarProgram.createKernel("volumeRayMarching");
-
-    vectorAddKernel = vectorProgram.createKernel("vectorAddField");
-    vectorCopyKernel = vectorProgram.createKernel("vectorCopy");
-    vectorAdvectionKernel = vectorProgram.createKernel("vectorAdvection");
-    vectorDiffusionKernel = vectorProgram.createKernel("vectorDiffusion");
-    vectorInitFieldKernel = vectorProgram.createKernel("vectorInitField");
-    vectorBoundariesKernel = vectorProgram.createKernel("vectorBoundaries");
-    vectorProjectionFirst = vectorProgram.createKernel("vectorProjectionFirst");
-    vectorProjectionSecond = vectorProgram.createKernel("vectorProjectionSecond");
-    vectorProjectionThird = vectorProgram.createKernel("vectorProjectionThird");
-    vectorVorticityFirstKernel = vectorProgram.createKernel("vectorVorticityConfinementFirst");
-    vectorVorticitySecondKernel = vectorProgram.createKernel("vectorVorticityConfinementSecond");
 
     localThreads = (Math.ceil((dim + 2) / 32)) * 32;
 }
