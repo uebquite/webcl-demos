@@ -232,10 +232,7 @@ function step() {
     if(running == true) {
         timeElapsed = Date.now() - prevTime;
         prevTime = Date.now();
-        timerConsole.innerHTML = "<br>FPS: " + ((1/timeElapsed) * 1000).toFixed(0);
-        //timerConsole.innerHTML += "<br>WebCL  (ms): " + clTime;
-        //timerConsole.innerHTML += "<br>WebCL memory transfers (ms): " + clMemTime;
-        //timerConsole.innerHTML += "<br>Raymarch (ms): " + raymarchTime;
+        timerConsole.innerHTML = "<br>FPS: " + ((1/timeElapsed) * 1000).toFixed();
 
         jsTime = 0;
         clTime = 0;
