@@ -13,32 +13,36 @@
  * @author Alexandre Rocha <alerock@gmail.com>
  */
 
-window.WebCLCommon = (function(debug){
+window.WebCLCommon = (function (debug) {
+
+    "use strict";
 
     var NO_WEBCL_FOUND = "Unfortunately your system does not support WebCL";
     var NO_PLATFORM_FOUND = "No WebCL platform found in your system";
     var NO_DEVICE_FOUND = "No WebCL device found in your system";
     var EXTENSION_NOT_SUPPORTED = "Extension is not supported";
     var INVALID_SEQUENCE = "Context is null, you must create a context " +
-    		"before call createWebCLProgram";
+            "before call createWebCLProgram";
 
     /* Global vars */
-    var platforms=[], devices=[], context = null, program = null, debug = false;
+    var platforms = [], devices = [], context = null, program = null;
 
     /**
      * Return devices according required type
      *
      * @param {CLenum} type - CLenum that represents a device type
      */
-    var getDevicesPerType = function(type) {
-        var deviceList = [];
+    var getDevicesPerType = function (type) {
+        var deviceList = [], i;
 
         try {
-            for (var i=0; i<platforms.length; i++) {
+            for (i = 0; i < platforms.length; i++) {
                 addElementsFromList(platforms[i].getDevices(type), deviceList);
             }
-        } catch(e) {
-            if (debug) console.error(e);
+        } catch (e) {
+            if (debug) {
+                console.error(e);
+            }
             throw e;
         }
 
@@ -51,17 +55,18 @@ window.WebCLCommon = (function(debug){
      * @param {Array} source - Array with elements to be copied
      * @param {Array} target - Array where the elements will be placed
      */
-    var addElementsFromList = function(source, target) {
+    var addElementsFromList = function (source, target) {
+        var i;
 
         if (!source instanceof Array) {
-            throw new Error ("[source] must be an Array");
+            throw new Error("[source] must be an Array");
         }
 
         if (!target instanceof Array) {
-            throw new Error ("[target] must be an Array");
+            throw new Error("[target] must be an Array");
         }
 
-        for (var i=0; i<source.length; i++) {
+        for (i = 0; i < source.length; i++) {
             target.push(source[i]);
         }
     };
@@ -74,11 +79,13 @@ window.WebCLCommon = (function(debug){
          * platforms and devices. Type can be ALL, CPU or GPU.
          *
          */
-        init : function(type) {
+        init : function (type) {
 
-            if (window.webcl == undefined) {
+            var i;
+
+            if (window.webcl === undefined) {
                 throw new Error(NO_WEBCL_FOUND);
-              }
+            }
 
             platforms = webcl.getPlatforms();
 
@@ -88,7 +95,7 @@ window.WebCLCommon = (function(debug){
 
             devices = []; //clear device list
 
-            for (var i=0; i<platforms.length; i++) {
+            for (i = 0; i < platforms.length; i++) {
                 switch (type) {
                 case "CPU":
                     addElementsFromList(platforms[i].getDevices(webcl.DEVICE_TYPE_CPU), devices);
@@ -122,7 +129,7 @@ window.WebCLCommon = (function(debug){
          * @param {WebCLContextProperties} props
          * @returns {WebCLContext} context
          */
-        createContext : function(props){
+        createContext : function (props) {
             var ctxProps = {};
             var resource;
             var extension;
@@ -137,10 +144,10 @@ window.WebCLCommon = (function(debug){
             resource = (props && props.extension) ? props.extension : null;
 
             try {
-                if(resource) {
+                if (resource) {
                     ctxProps.shareGroup = (props && props.shareGroup) ? props.shareGroup : 1;
                     extension = webcl.getExtension(resource);
-                    if(!extension) {
+                    if (!extension) {
                         throw new Error(EXTENSION_NOT_SUPPORTED);
                     }
                     context = extension.createContext(ctxProps);
@@ -149,7 +156,9 @@ window.WebCLCommon = (function(debug){
                     context = webcl.createContext(ctxProps);
                 }
             } catch (e) {
-                if (debug) console.error(e);
+                if (debug) {
+                    console.error(e);
+                }
                 throw e;
             }
 
@@ -163,27 +172,22 @@ window.WebCLCommon = (function(debug){
          * @param {String} type - CPU, GPU
          * @returns {WebCLDevice[]} devices
          */
-        getDevices : function(type) {
+        getDevices : function (type) {
 
             switch (type) {
 
             case "ALL":
                 return devices;
-                break;
 
             case "CPU":
                 return getDevicesPerType(webcl.DEVICE_TYPE_CPU);
-                break;
 
             case "GPU":
                 return getDevicesPerType(webcl.DEVICE_TYPE_GPU);
-                break;
 
             default:
                 throw new Error("Unknow device type " + type);
             }
-
-            return devices;
         },
 
         /**
@@ -191,7 +195,7 @@ window.WebCLCommon = (function(debug){
          *
          * @return {WebCLPlatforms[]} platforms
          */
-        getPlatforms : function() {
+        getPlatforms : function () {
             return platforms;
         },
 
@@ -201,7 +205,7 @@ window.WebCLCommon = (function(debug){
          * @param {String} src - OpenCL code source
          * @returns {WebCLProgram} program
          */
-        createProgram : function(src) {
+        createProgram : function (src) {
 
             try {
                 if (!context) {
@@ -211,21 +215,25 @@ window.WebCLCommon = (function(debug){
                 program = context.createProgram(src);
 
             } catch (e) {
-                if (debug) console.error(e);
+                if (debug) {
+                    console.error(e);
+                }
                 throw e;
             }
 
             return program;
         },
 
-        createCommandQueue : function(device){
+        createCommandQueue : function (device) {
 
             var cmdQueue;
 
             try {
                 cmdQueue = context.createCommandQueue(device || devices[0]);
             } catch (e) {
-                if (debug) console.error(e);
+                if (debug) {
+                    console.error(e);
+                }
                 throw e;
             }
 
@@ -240,14 +248,16 @@ window.WebCLCommon = (function(debug){
          * @param {WebCLDevice[]} deviceList - Optional. If null, devices[0] will be used
          * @returns {WebCLProgram} program
          */
-        createProgramBuild : function(src, deviceList) {
+        createProgramBuild : function (src, deviceList) {
             var program;
 
             try {
                 program  = this.createProgram(src);
                 program.build(deviceList || [devices[0]]);
             } catch (e) {
-                if (debug) console.error(e);
+                if (debug) {
+                    console.error(e);
+                }
                 throw e;
             }
 
@@ -258,7 +268,7 @@ window.WebCLCommon = (function(debug){
          * Set global WebCLCommon.debug to true
          *
          */
-        setDebugOn : function() {
+        setDebugOn : function () {
             debug = true;
         },
 
@@ -266,7 +276,7 @@ window.WebCLCommon = (function(debug){
          * Set global WebCLCommon.debug to false
          *
          */
-        setDebugOff : function(){
+        setDebugOff : function () {
             debug = false;
         }
     };
