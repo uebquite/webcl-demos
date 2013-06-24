@@ -2,13 +2,12 @@
 
 <!-- based on XY Model http://www.ibiblio.org/e-notes/webcl/mc/xy2.html -->
 
-<TITLE>XY model. Modified chess-board algorithm</TITLE>
+<title>XY model. Modified chess-board algorithm</title>
 
 <script src="../common/gl.js" type="text/javascript"></script>
 <script src="../common/webcl.js" type="text/javascript"></script>
 
 <script id="clXY" type="text/x-opencl">
-
 constant int n = 512;
 constant float h = 1.0f/512.0f, hy = 2.0f/512.0f;
 
@@ -95,147 +94,46 @@ __kernel void kPix(read_only image2d_t sB, read_only image2d_t sW,
 
 <script type="text/javascript">
 
-function loadKernel ( id ){
-    var shaderScript = document.getElementById ( id );
+function loadKernel(id) {
+    var shaderScript = document.getElementById(id);
     var str = "";
     var k = shaderScript.firstChild;
 
-    while (k){
-        if ( k.nodeType == 3 ) str += k.textContent;
+    while (k) {
+        if (k.nodeType === 3) {
+            str += k.textContent;
+        }
         k = k.nextSibling;
     }
 
     return str;
 }
 
-var T = .02, n = 512, n2 = n/2,  it = 100, bufSize = 4*n*n, ev,
-    ctx_c, frames = 0, animation = "animate", time, delay = 0, randByteLength = 4*n*n2,
+var T = 0.02, n = 512, n2 = n / 2,  it = 100, bufSize = 4 * n * n, ev,
+    ctx_c, frames = 0, animation = "animate", time, delay = 0, randByteLength = 4 * n * n2,
     useGPU = true, kernelSrc, frTimer;
 
 var kSpinB, kSpinW, kPix, cmdQueue, iSpinB, iSpinB1, iSpinW, iSpinW1,
-    bufPix, outBuffer, iTemp, spin;
+    bufPix, outBuffer, iTemp, spin, bufRand;
 
 var SPIN_GLOBAL_SIZE = new Int32Array([n, n2]);
 var PIX_GLOBAL_SIZE = new Int32Array([n, n]);
 var IMAGE_ORIGIN = new Int32Array([0, 0, 0]);
 var IMAGE_REGION = new Int32Array([n, n2, 1]);
 
-function initWebCL () {
-  try {
-
-    if (!kernelSrc) {
-        kernelSrc = loadKernel("clXY");
-    }
-
-    WebCLCommon.init(useGPU ? "GPU" : "CPU");
-    var ctx = WebCLCommon.createContext();
-    var program = WebCLCommon.createProgramBuild(kernelSrc);
-    cmdQueue = WebCLCommon.createCommandQueue();
-
-    bufRand = ctx.createBuffer (webcl.MEM_READ_WRITE,randByteLength);
-    var format = {channelOrder:webcl.RGBA, channelDataType:webcl.FLOAT,
-            width: n, height: n2, rowPitch: 0};
-    iSpinB  = ctx.createImage(webcl.MEM_READ_WRITE, format);
-    iSpinB1 = ctx.createImage(webcl.MEM_READ_WRITE, format);
-    iSpinW  = ctx.createImage(webcl.MEM_READ_WRITE, format);
-    iSpinW1 = ctx.createImage(webcl.MEM_READ_WRITE, format);
-    iTemp   = ctx.createImage(webcl.MEM_READ_WRITE, format);
-    bufPix  = ctx.createBuffer (webcl.MEM_WRITE_ONLY, bufSize);
-
-    kSpinB = program.createKernel ("kSpinB");
-    kSpinB.setArg(3, bufRand);
-    kSpinB.setArg(4, 1/T, WebCLKernelArgumentTypes.FLOAT);
-
-    kSpinW = program.createKernel ("kSpinW");
-    kSpinW.setArg(3, bufRand);
-    kSpinW.setArg(4, 1/T, WebCLKernelArgumentTypes.FLOAT);
-
-    kPix = program.createKernel("kPix");
-    kPix.setArg(2, bufPix);
-
-    var UIrand = new Uint32Array(randByteLength);
-    for ( var i = 0; i <randByteLength;  i++ ) {
-        UIrand[i] = Math.floor(Math.random() * 4294967295);
-    }
-
-    initImageSpin();
-
-    cmdQueue.enqueueWriteBuffer(bufRand, true, 0,randByteLength, UIrand);
-    outBuffer = new Uint8Array(bufSize);
-  } catch(e) {
-    document.getElementById("output").innerHTML
-      += "<h3>ERROR:</h3><pre style=\"color:red;\">" + e.message + "</pre>";
-    console.error(e);
-    throw e;
-  }
-  var canvas = document.getElementById("c");
-  init_gl(canvas);
-  time = new Date().getTime();
-  frTimer = setInterval(fr, 500);
-  anim();
-}
-
 function randomSpin() {
+    var i;
 
     /* Like a singleton */
     if (!spin) {
-        spin = new Float32Array(n*n2);
+        spin = new Float32Array(n * n2);
     }
 
-    for ( var i = 0; i < n*n2;  i++ ) {
+    for (i = 0; i < n * n2; i++) {
         spin[i] = Math.random();
     }
 
     return spin;
-}
-
-function draw(){
-
-  for ( var i = 0; i < it;  i++ ){
-    kSpinW.setArg(0, iSpinB);
-    kSpinW.setArg(1, iSpinW);
-    kSpinW.setArg(2, iSpinW1);
-
-    try {
-        cmdQueue.enqueueNDRangeKernel(kSpinW, null, SPIN_GLOBAL_SIZE, null);
-    } catch (e) {
-        console.error(e);
-        throw e;
-    }
-    cmdQueue.flush();
-
-    /* Swap images */
-    cmdQueue.enqueueCopyImage(iSpinW1, iTemp,   IMAGE_ORIGIN, IMAGE_ORIGIN, IMAGE_REGION);
-    cmdQueue.enqueueCopyImage(iSpinW,  iSpinW1, IMAGE_ORIGIN, IMAGE_ORIGIN, IMAGE_REGION);
-    cmdQueue.enqueueCopyImage(iTemp,   iSpinW,  IMAGE_ORIGIN, IMAGE_ORIGIN, IMAGE_REGION);
-
-    kSpinB.setArg(0, iSpinB);
-    kSpinB.setArg(1, iSpinW);
-    kSpinB.setArg(2, iSpinB1);
-
-    cmdQueue.enqueueNDRangeKernel(kSpinB, null, SPIN_GLOBAL_SIZE, null);
-    cmdQueue.flush();
-
-    /* Swap images */
-    cmdQueue.enqueueCopyImage(iSpinB1, iTemp,   IMAGE_ORIGIN, IMAGE_ORIGIN, IMAGE_REGION);
-    cmdQueue.enqueueCopyImage(iSpinB,  iSpinB1, IMAGE_ORIGIN, IMAGE_ORIGIN, IMAGE_REGION);
-    cmdQueue.enqueueCopyImage(iTemp,   iSpinB,  IMAGE_ORIGIN, IMAGE_ORIGIN, IMAGE_REGION);
-  }
-
-  kPix.setArg(0, iSpinB);
-  kPix.setArg(1, iSpinW);
-
-  cmdQueue.enqueueNDRangeKernel(kPix, null, PIX_GLOBAL_SIZE, null);
-  cmdQueue.enqueueReadBuffer (bufPix, true, 0, bufSize, outBuffer);
-  cmdQueue.finish();
-
-  try {
-      draw_gl(n, n, outBuffer);
-      frames++;
-  } catch (e) {
-      console.error(e);
-      throw e;
-  }
 }
 
 /**
@@ -246,89 +144,215 @@ function initImageSpin() {
     cmdQueue.enqueueWriteImage(iSpinW, true, IMAGE_ORIGIN, IMAGE_REGION, 0, randomSpin());
 }
 
-function anim(){
-   draw();
-   switch ( animation ){
-     case "reset":
-      initImageSpin();
-      animation = "animate";
-     case "animate":
-       if (delay == 0) requestAnimationFrame(anim);
-       else setTimeout("requestAnimFrame(anim)", delay);
-       break;
-     case "stop":
-       break;
-   }
+function draw() {
+    var i;
+
+    for (i = 0; i < it; i++) {
+        kSpinW.setArg(0, iSpinB);
+        kSpinW.setArg(1, iSpinW);
+        kSpinW.setArg(2, iSpinW1);
+
+        try {
+            cmdQueue.enqueueNDRangeKernel(kSpinW, null, SPIN_GLOBAL_SIZE, null);
+        } catch (e) {
+            console.error(e);
+            throw e;
+        }
+        cmdQueue.flush();
+
+        /* Swap images */
+        cmdQueue.enqueueCopyImage(iSpinW1, iTemp,   IMAGE_ORIGIN, IMAGE_ORIGIN, IMAGE_REGION);
+        cmdQueue.enqueueCopyImage(iSpinW,  iSpinW1, IMAGE_ORIGIN, IMAGE_ORIGIN, IMAGE_REGION);
+        cmdQueue.enqueueCopyImage(iTemp,   iSpinW,  IMAGE_ORIGIN, IMAGE_ORIGIN, IMAGE_REGION);
+
+        kSpinB.setArg(0, iSpinB);
+        kSpinB.setArg(1, iSpinW);
+        kSpinB.setArg(2, iSpinB1);
+
+        cmdQueue.enqueueNDRangeKernel(kSpinB, null, SPIN_GLOBAL_SIZE, null);
+        cmdQueue.flush();
+
+        /* Swap images */
+        cmdQueue.enqueueCopyImage(iSpinB1, iTemp,   IMAGE_ORIGIN, IMAGE_ORIGIN, IMAGE_REGION);
+        cmdQueue.enqueueCopyImage(iSpinB,  iSpinB1, IMAGE_ORIGIN, IMAGE_ORIGIN, IMAGE_REGION);
+        cmdQueue.enqueueCopyImage(iTemp,   iSpinB,  IMAGE_ORIGIN, IMAGE_ORIGIN, IMAGE_REGION);
+    }
+
+    kPix.setArg(0, iSpinB);
+    kPix.setArg(1, iSpinW);
+
+    cmdQueue.enqueueNDRangeKernel(kPix, null, PIX_GLOBAL_SIZE, null);
+    cmdQueue.enqueueReadBuffer(bufPix, true, 0, bufSize, outBuffer);
+    cmdQueue.finish();
+
+    try {
+        draw_gl(n, n, outBuffer);
+        frames++;
+    } catch (er) {
+        console.error(er);
+        throw er;
+    }
 }
-function run(v) {
-  if( animation == "animate" ){
-    animation = "stop";
-    document.getElementById('runBtn').value = "Run ";}
-  else{
-    animation = "animate";
-    document.getElementById('runBtn').value = "Stop";
+
+function doAnim() {
+    if (delay === 0) {
+        requestAnimationFrame(anim);
+    } else {
+        setTimeout("requestAnimFrame(anim)", delay);
+    }
+}
+
+function anim() {
+    draw();
+    switch (animation) {
+    case "reset":
+        initImageSpin();
+        animation = "animate";
+        doAnim();
+        break;
+    case "animate":
+        doAnim();
+        break;
+    case "stop":
+        break;
+    }
+}
+
+function fr() {
+    var ti = new Date().getTime();
+    var fps = Math.round(1000 * frames / (ti - time));
+    document.getElementById("framerate").value = fps;
+    frames = 0;
+    time = ti;
+}
+
+function initWebCL() {
+    var i;
+
+    try {
+
+        if (!kernelSrc) {
+            kernelSrc = loadKernel("clXY");
+        }
+
+        WebCLCommon.init(useGPU ? "GPU" : "CPU");
+        var ctx = WebCLCommon.createContext();
+        var program = WebCLCommon.createProgramBuild(kernelSrc);
+        cmdQueue = WebCLCommon.createCommandQueue();
+
+        bufRand = ctx.createBuffer(webcl.MEM_READ_WRITE, randByteLength);
+        var format = {channelOrder: webcl.RGBA, channelDataType: webcl.FLOAT,
+                width: n, height: n2, rowPitch: 0};
+        iSpinB  = ctx.createImage(webcl.MEM_READ_WRITE, format);
+        iSpinB1 = ctx.createImage(webcl.MEM_READ_WRITE, format);
+        iSpinW  = ctx.createImage(webcl.MEM_READ_WRITE, format);
+        iSpinW1 = ctx.createImage(webcl.MEM_READ_WRITE, format);
+        iTemp   = ctx.createImage(webcl.MEM_READ_WRITE, format);
+        bufPix  = ctx.createBuffer(webcl.MEM_WRITE_ONLY, bufSize);
+
+        kSpinB = program.createKernel("kSpinB");
+        kSpinB.setArg(3, bufRand);
+        kSpinB.setArg(4, 1 / T, WebCLKernelArgumentTypes.FLOAT);
+
+        kSpinW = program.createKernel("kSpinW");
+        kSpinW.setArg(3, bufRand);
+        kSpinW.setArg(4, 1 / T, WebCLKernelArgumentTypes.FLOAT);
+
+        kPix = program.createKernel("kPix");
+        kPix.setArg(2, bufPix);
+
+        var UIrand = new Uint32Array(randByteLength);
+        for (i = 0; i < randByteLength; i++) {
+            UIrand[i] = Math.floor(Math.random() * 4294967295);
+        }
+
+        initImageSpin();
+
+        cmdQueue.enqueueWriteBuffer(bufRand, true, 0, randByteLength, UIrand);
+        outBuffer = new Uint8Array(bufSize);
+    } catch (e) {
+        document.getElementById("output").innerHTML
+            += "<h3>ERROR:<\/h3><pre style=\"color:red;\">" + e.message + "<\/pre>";
+        console.error(e);
+        throw e;
+    }
+
+    var canvas = document.getElementById("c");
+    init_gl(canvas);
+    time = new Date().getTime();
+    frTimer = setInterval(fr, 500);
     anim();
-  }
+}
+
+function run(v) {
+    if (animation === "animate") {
+        animation = "stop";
+        document.getElementById('runBtn').value = "Run ";
+    } else {
+        animation = "animate";
+        document.getElementById('runBtn').value = "Stop";
+        anim();
+    }
 }
 function reset() {
-  if( animation == "stop" ){
-    animation = "reset";
-    document.getElementById('runBtn').value = "Stop";
-    anim();}
-  else animation = "reset";
+    if (animation === "stop") {
+        animation = "reset";
+        document.getElementById('runBtn').value = "Stop";
+        anim();
+    } else {
+        animation = "reset";
+    }
 }
+
 function setDelay(val) {
-  delay = parseInt(val);
+    delay = parseInt(val, 10);
 }
-function fr(){
-  var ti = new Date().getTime();
-  var fps = Math.round(1000*frames/(ti - time));
-  document.getElementById("framerate").value = fps;
-  frames = 0;  time = ti;
+
+function setT(v) {
+    var T = v.valueOf();
+    kSpinB.setKernelArg(4, 1 / T, WebCL.types.FLOAT);
+    kSpinW.setKernelArg(4, 1 / T, WebCL.types.FLOAT);
 }
-function setT(v){
-  var T = v.valueOf();
-  kSpinB.setKernelArg (4, 1/T, WebCL.types.FLOAT);
-  kSpinW.setKernelArg (4, 1/T, WebCL.types.FLOAT);
-}
+
 function setIt(val) {
-  it = parseInt(val);
+    it = parseInt(val, 10);
 }
 
 function toogleDevice(device) {
     window.clearInterval(frTimer);
-    useGPU = (device == 'CPU') ? false : true;
+    useGPU = (device === 'CPU') ? false : true;
     initWebCL();
 }
 
 </script>
 <style type="text/css">
-  H1{ font-size: 120%; color: green}
-  H2{ font-size: 100%; color: green}
-  pre{ color: darkblue}
+  h1 {font-size: 120%; color: green; }
+  h2 {font-size: 100%; color: green; }
+  pre {color: darkblue; }
 </style>
-</head><body onload="initWebCL()">
+</head><body onload="initWebCL();">
 
 <h1>XY model. Modified chess-board algorithm</h1>
 
 <p id="output"></p>
 <canvas id="c" width="512" height="512"></canvas>
-<br><button onclick="reset()">Reset</button>
-<input type="button" onclick="run()" value="Stop" size="1" id="runBtn">
-T<input size="4" value="0.02" onchange="setT( this.value )">
-It<input size="1" value="100" onchange="setIt( this.value )">
-delay<input size="2" value="0" onchange="setDelay( this.value )">
-fps<input size="2" id="framerate">
+<br><button onclick="reset();">Reset</button>
+<input type="button" onclick="run();" value="Stop" size="1" id="runBtn" />
+T<input size="4" value="0.02" onchange="setT(this.value);" />
+It<input size="1" value="100" onchange="setIt(this.value);" />
+delay<input size="2" value="0" onchange="setDelay(this.value);" />
+fps<input size="2" id="framerate" />
 
-GPU<input type="radio" name="device" id="GPUradio" onclick="toogleDevice('GPU')" checked="true">
-CPU<input type="radio" name="device" id="CPUradio" onclick="toogleDevice('CPU')">
+GPU<input type="radio" name="device" id="GPUradio" onclick="toogleDevice('GPU');" checked="true" />
+CPU<input type="radio" name="device" id="CPUradio" onclick="toogleDevice('CPU');" />
 
 <p>GPU based Monte-Carlo simulation of the XY model on the square 512&times;512
-grid. <i>it</i> is the number of MC iterations per frame.
+grid. <i>it</i> is the number of MC iterations per frame.</p>
 
 <p>Different colors correspond to different spin phases.
 Therefore vortices appear as point deffects where all colors meet
 together (see <a href="../../Perc/xy.htm">Vortices in the XY model</a>).
+</p>
 <table><tr><td>
 <img width="250" height="150" title="xy" src="fig/xy.jpg">
 </td><td>
@@ -341,5 +365,4 @@ For <i>T &lt; 0</i> you will get the antiferromagnetic model.
 
 <hr><a href="../webcl.htm">WebCL Demos</a>
 &nbsp; &nbsp; <i>updated</i> 17 Sep 2011
-
 </body></html>
