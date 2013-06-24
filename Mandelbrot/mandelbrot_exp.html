@@ -1,8 +1,7 @@
+<html>
 <!--
     Based on: http://www.ibiblio.org/e-notes/webcl/mandelbrot_exp.html
 -->
-
-<html>
 <head>
 <title>The Mandelbrot set explorer</title>
 
@@ -10,7 +9,7 @@
 <script src="../common/webcl.js" type="text/javascript"></script>
 
 <script id="clProgramMandelbrot" type="text/x-opencl">
-
+/*
 int iClamp(int i)
 {
   return min(max(0, i), 255);
@@ -185,168 +184,187 @@ __kernel void ckMandelbrot(__global uchar4* col,
        iClamp( 512 - (int)abs(c - 1024) ),
        255);
     }
-  }
+  }*/
 </script>
 
 <script type="text/javascript">
 
 function getKernel(id) {
-   var shaderScript = document.getElementById(id);
-   var str = "";
-   var k = shaderScript.firstChild;
-   while (k) {
-     if (k.nodeType == 3) str += k.textContent;
-     k = k.nextSibling;
-   }
-   return str;
+    var shaderScript = document.getElementById(id);
+    var str = "";
+    var k = shaderScript.firstChild;
+    while (k) {
+        if (k.nodeType === 3) {
+            str += k.textContent;
+        }
+        k = k.nextSibling;
+    }
+    return str;
 }
 
-var ctx_c, imgd, scale = .01, zoom = 1.01, zoom2 = 1.05,
-    Ro = .37014983130958534, Io = .10511722270082503, dR = -Ro, dI = -Io,
+var ctx_c, imgd, scale = 0.01, zoom = 1.01, zoom2 = 1.05,
+    Ro = 0.37014983130958534, Io = 0.10511722270082503, dR = -Ro, dI = -Io,
     animation = "animate", time, frames = 0, delay = 0;
 var program, kernel, cmdQueue, bufCol, outBuffer, bufSize, frTimer, useGPU = true;
 var globalWS = new Int32Array(2);
 
-function CL_mandelbrot () {
-  var canvas = document.getElementById("c");
-  canvas.addEventListener('mouseup', ev_mouseup, false);
+function mandelbrotCL() {
+    var canvas = document.getElementById("c");
+    canvas.addEventListener('mouseup', ev_mouseup, false);
 
-  init_gl(canvas, false);
+    init_gl(canvas, false);
 
-  nx = canvas.width;
-  ny = canvas.height;
+    nx = canvas.width;
+    ny = canvas.height;
 
-  bufSize = 4 * nx * ny;
+    bufSize = 4 * nx * ny;
 
-  var kernelSrc = getKernel("clProgramMandelbrot");
+    var kernelSrc = getKernel("clProgramMandelbrot");
 
-  try {
+    try {
 
-    WebCLCommon.init(useGPU ? "GPU" : "CPU");
+        WebCLCommon.init(useGPU ? "GPU" : "CPU");
 
-    var ctx = WebCLCommon.createContext();
-    var program = WebCLCommon.createProgramBuild(kernelSrc);
-    cmdQueue = WebCLCommon.createCommandQueue();
+        var ctx = WebCLCommon.createContext();
+        var program = WebCLCommon.createProgramBuild(kernelSrc);
+        cmdQueue = WebCLCommon.createCommandQueue();
 
-    bufCol = ctx.createBuffer(webcl.MEM_WRITE_ONLY, bufSize);
-    kernel = program.createKernel("ckManZ2sm");
+        bufCol = ctx.createBuffer(webcl.MEM_WRITE_ONLY, bufSize);
+        kernel = program.createKernel("ckManZ2sm");
 
-    globalWS[0] = nx;
-    globalWS[1] = ny;
+        globalWS[0] = nx;
+        globalWS[1] = ny;
 
-    kernel.setArg (0, bufCol);
+        kernel.setArg(0, bufCol);
 
-    outBuffer = new Uint8Array(Uint8Array.BYTES_PER_ELEMENT * bufSize);
+        outBuffer = new Uint8Array(Uint8Array.BYTES_PER_ELEMENT * bufSize);
 
-  } catch(e) {
-    console.error("ERROR: " + e.message, e);
-    throw e;
-  }
-
-  time = new Date().getTime();
-  frTimer = setInterval(fr, 500);
-  anim();
-
-  function ev_mouseup (ev) {
-    if (ev.button != 0) return;
-    var x = ev.layerX,  y = ev.layerY;
-    var R1 = Ro + dR,  I1 = Io + dR;
-    dR = -(x - 256) * scale;  dI = -(y - 256) * scale;
-    Ro = R1 - dR;  Io = I1 - dI;
-  }
-  var wheelHandler = function(ev) {
-    var del = .001;
-    if (ev.shiftKey) del = .1;
-    var ds = ((ev.detail || ev.wheelDelta) > 0) ? del : -del;
-    zoom += ds;
-    document.getElementById("zoom").value = Math.round(1000*zoom)/1000;
-    ev.preventDefault();
-  };
-  canvas.addEventListener('DOMMouseScroll', wheelHandler, false);
-  canvas.addEventListener('mousewheel', wheelHandler, false);
-}
-function draw() {
-  scale /= zoom;
-  dR /= zoom2;  dI /= zoom2;
-  kernel.setArg (1, scale, WebCLKernelArgumentTypes.FLOAT);
-  kernel.setArg (2, Ro + dR, WebCLKernelArgumentTypes.FLOAT);
-  kernel.setArg (3, Io + dI, WebCLKernelArgumentTypes.FLOAT);
-  cmdQueue.enqueueNDRangeKernel(kernel, null, globalWS, null);
-  cmdQueue.enqueueReadBuffer(bufCol, true, 0, bufSize, outBuffer);
-  cmdQueue.finish();
-  draw_gl(nx, ny, outBuffer);
-  frames++;
-}
-function anim(v) {
-  if( animation === "animate" ){
-     draw();
-     if (delay === 0) {
-        requestAnimationFrame(anim);
+    } catch (e) {
+        console.error("ERROR: " + e.message, e);
+        throw e;
     }
-     else setTimeout("requestAnimationFrame(anim)", delay);
-  }
-}
-function setFormula(s) {
-   kernel = program.createKernel(s);
-   kernel.setArg(0, bufCol);
-   scale = .01;
-   if(animation == "stop"){
-     animation = "animate";
-     document.getElementById('runBtn').value = "Stop";
-     anim();
-   }
-}
-function run(v) {
-  if( animation == "animate" ){
-    animation = "stop";
-    document.getElementById('runBtn').value = "Run ";}
-  else{
-    animation = "animate";
-    document.getElementById('runBtn').value = "Stop";
+
+    time = new Date().getTime();
+    frTimer = setInterval(fr, 500);
     anim();
-  }
+
+    function ev_mouseup(ev) {
+        if (ev.button !== 0) {
+            return;
+        }
+        var x = ev.layerX,  y = ev.layerY;
+        var R1 = Ro + dR,  I1 = Io + dR;
+        dR = -(x - 256) * scale;
+        dI = -(y - 256) * scale;
+        Ro = R1 - dR;
+        Io = I1 - dI;
+    }
+
+    var wheelHandler = function (ev) {
+        var del = 0.001;
+        if (ev.shiftKey) {
+            del = 0.1;
+        }
+        var ds = ((ev.detail || ev.wheelDelta) > 0) ? del : -del;
+        zoom += ds;
+        document.getElementById("zoom").value = Math.round(1000 * zoom) / 1000;
+        ev.preventDefault();
+    };
+    canvas.addEventListener('DOMMouseScroll', wheelHandler, false);
+    canvas.addEventListener('mousewheel', wheelHandler, false);
 }
-function reset(){
-   scale = .01;
+
+function draw() {
+    scale /= zoom;
+    dR /= zoom2;
+    dI /= zoom2;
+    kernel.setArg(1, scale, WebCLKernelArgumentTypes.FLOAT);
+    kernel.setArg(2, Ro + dR, WebCLKernelArgumentTypes.FLOAT);
+    kernel.setArg(3, Io + dI, WebCLKernelArgumentTypes.FLOAT);
+    cmdQueue.enqueueNDRangeKernel(kernel, null, globalWS, null);
+    cmdQueue.enqueueReadBuffer(bufCol, true, 0, bufSize, outBuffer);
+    cmdQueue.finish();
+    draw_gl(nx, ny, outBuffer);
+    frames++;
 }
+
+function anim(v) {
+    if (animation === "animate") {
+        draw();
+        if (delay === 0) {
+            requestAnimationFrame(anim);
+        } else {
+            setTimeout("requestAnimationFrame(anim)", delay);
+        }
+    }
+}
+
+function setFormula(s) {
+    kernel = program.createKernel(s);
+    kernel.setArg(0, bufCol);
+    scale = 0.01;
+    if (animation === "stop") {
+        animation = "animate";
+        document.getElementById('runBtn').value = "Stop";
+        anim();
+    }
+}
+
+function run(v) {
+    if (animation === "animate") {
+        animation = "stop";
+        document.getElementById('runBtn').value = "Run ";
+    } else {
+        animation = "animate";
+        document.getElementById('runBtn').value = "Stop";
+        anim();
+    }
+}
+
+function reset() {
+    scale = 0.01;
+}
+
 function setDelay(val) {
-  delay = parseInt(val);
+    delay = parseInt(val, 10);
 }
+
 function setZoom(v) {
-  zoom = v.valueOf();
+    zoom = v.valueOf();
 }
-function fr(){
-  var ti = new Date().getTime();
-  var fps = Math.round(1000*frames/(ti - time));
-  document.getElementById("framerate").value = fps;
-  frames = 0;  time = ti;
+
+function fr() {
+    var ti = new Date().getTime();
+    var fps = Math.round(1000 * frames / (ti - time));
+    document.getElementById("framerate").value = fps;
+    frames = 0;
+    time = ti;
 }
 
 function toogleDevice(device) {
     window.clearInterval(frTimer);
-    useGPU = (device == 'CPU') ? false : true;
-    CL_mandelbrot();
+    useGPU = (device === 'CPU') ? false : true;
+    mandelbrotCL();
 }
 
 </script>
 <style type="text/css">
-  H1{ font-size: 120%; color: green}
-  H2{ font-size: 100%; color: green}
-  pre{ color: darkblue}
-  canvas{ position: relative }
-</style>
+  h1{ font-size: 120%; color: green; }
+  h2{ font-size: 100%; color: green; }
+  pre{ color: darkblue; }
+  canvas{ position: relative; }
 </style>
 </head>
-<body onload="CL_mandelbrot()">
+<body onload="mandelbrotCL();">
 
 <canvas id="c" width="512" height="512" ></canvas>
 
-<br><button onclick="reset()">Reset</button>
-<input type="button" onclick="run()" value="Stop" size="1" id="runBtn">
-zoom<input size="4" id="zoom" value="1.01" onchange="setZoom( this.value )">
-delay<input size="2" value="0" onchange="setDelay( this.value )">
-fps<input size="2" id="framerate">
-formula<select onchange="setFormula(this.options[this.selectedIndex].value)">
+<br><button onclick="reset();">Reset</button>
+<input type="button" onclick="run();" value="Stop" size="1" id="runBtn">
+zoom<input type="text" size="4" id="zoom" value="1.01" onchange="setZoom(this.value);">
+delay<input type="text" size="2" value="0" onchange="setDelay(this.value);">
+fps<input type="text" size="2" id="framerate">
+formula<select onchange="setFormula(this.options[this.selectedIndex].value);">
    <option value="ckManZ2sm">z^2 sm
    <option value="ckMandelbrot">z^2
    <option value="ckManZ2de">z^2 de
@@ -356,8 +374,7 @@ formula<select onchange="setFormula(this.options[this.selectedIndex].value)">
    <option value="ckManZ4">z^4
    <option value="ckMakin">Makin
    </select>
-GPU<input type="radio" name="device" id="GPUradio" onclick="toogleDevice('GPU')" checked="true">
-CPU<input type="radio" name="device" id="CPUradio" onclick="toogleDevice('CPU')">
-
+GPU<input type="radio" name="device" id="GPUradio" onclick="toogleDevice('GPU');" checked="true">
+CPU<input type="radio" name="device" id="CPUradio" onclick="toogleDevice('CPU');">
 
 </body></html>
