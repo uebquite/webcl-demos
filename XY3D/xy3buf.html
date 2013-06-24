@@ -1,9 +1,9 @@
+<html>
 <!--
     Based on: http://www.ibiblio.org/e-notes/webcl/mc/xy3buf.html
 -->
-
-<html><head>
-<TITLE>3D XY model. Vortex lines</TITLE>
+<head>
+<title>3D XY model. Vortex lines</title>
 
 <script src="CanvasMatrix.js" type="text/javascript"></script>
 <script src="xy3d_gl.js" type="text/javascript"></script>
@@ -121,163 +121,193 @@ void main(void) {
 
 <script type="text/javascript">
 
-function loadKernel ( id ){
-   var shaderScript = document.getElementById ( id );
-   var str = "";
-   var k = shaderScript.firstChild;
-   while ( k ){
-     if ( k.nodeType == 3 ) str += k.textContent;
-     k = k.nextSibling;
-   }
-   return str;
+function loadKernel(id) {
+    var shaderScript = document.getElementById(id);
+    var str = "";
+    var k = shaderScript.firstChild;
+    while (k) {
+        if (k.nodeType === 3) {
+            str += k.textContent;
+        }
+        k = k.nextSibling;
+    }
+    return str;
 }
 
 var T = 0.02, n = 64, it = 10, ev,
     delay = 0, ctx_c, frames = 0, animation = "animate", time;
-var kSpin, kPix, cmdQueue, bufRand, bSpin, bufPix, outBuffer, bufSize = 4*n*n*n;
-var elemNumber = n*n*n;
+var kSpin, kPix, cmdQueue, bufRand, bSpin, bufPix, outBuffer, bufSize = 4 * n * n * n;
+var elemNumber = n * n * n;
 
-var GLOBAL_WORK_SIZE = new Int32Array([n,n,n]);
-var LOCAL_WORK_SIZE = new Int32Array([4,4,4]);
+var GLOBAL_WORK_SIZE = new Int32Array([n, n, n]);
+var LOCAL_WORK_SIZE = new Int32Array([4, 4, 4]);
 
-function CL_rand () {
-  try {
-    WebCLCommon.init("GPU");
-    var ctx = WebCLCommon.createContext();
-    var kernelSrc = loadKernel("clXY");
-    var program = WebCLCommon.createProgramBuild(kernelSrc);
-    cmdQueue = WebCLCommon.createCommandQueue();
+function randCL() {
+    try {
+        WebCLCommon.init("GPU");
+        var ctx = WebCLCommon.createContext();
+        var kernelSrc = loadKernel("clXY");
+        var program = WebCLCommon.createProgramBuild(kernelSrc);
+        cmdQueue = WebCLCommon.createCommandQueue();
 
-    bufRand = ctx.createBuffer(webcl.MEM_READ_WRITE, bufSize);
-    bSpin   = ctx.createBuffer(webcl.MEM_READ_WRITE, bufSize);
-    bufPix  = ctx.createBuffer(webcl.MEM_WRITE_ONLY, bufSize);
+        bufRand = ctx.createBuffer(webcl.MEM_READ_WRITE, bufSize);
+        bSpin   = ctx.createBuffer(webcl.MEM_READ_WRITE, bufSize);
+        bufPix  = ctx.createBuffer(webcl.MEM_WRITE_ONLY, bufSize);
 
-    kSpin = program.createKernel ("kSpin");
-    kSpin.setArg(0, bSpin);
-    kSpin.setArg(1, bufRand);
-    kSpin.setArg(3, 1/T, WebCLKernelArgumentTypes.FLOAT);
-    kPix = program.createKernel("kPix");
-    kPix.setArg(0, bSpin);
-    kPix.setArg(1, bufPix);
+        kSpin = program.createKernel("kSpin");
+        kSpin.setArg(0, bSpin);
+        kSpin.setArg(1, bufRand);
+        kSpin.setArg(3, 1 / T, WebCLKernelArgumentTypes.FLOAT);
+        kPix = program.createKernel("kPix");
+        kPix.setArg(0, bSpin);
+        kPix.setArg(1, bufPix);
 
-    var UIrand = new Uint32Array(elemNumber);
-    for ( var i = 0; i < elemNumber;  i++ )
-      UIrand[i] = Math.floor(Math.random() * 4294967295);
+        var UIrand = new Uint32Array(elemNumber);
+        var i;
+        for (i = 0; i < elemNumber; i++) {
+            UIrand[i] = Math.floor(Math.random() * 4294967295);
+        }
 
-    initSpinBuffer();
+        initSpinBuffer();
 
-    cmdQueue.enqueueWriteBuffer(bufRand, true, 0, bufSize, UIrand);
-    outBuffer = new Uint8Array(bufSize);
-  } catch(e) {
-    document.getElementById("output").innerHTML
-      += "<h3>ERROR:</h3><pre style=\"color:red;\">" + e.message + "</pre>";
-    throw e;
-  }
-  canvas = document.getElementById("c");
-  init_gl();
+        cmdQueue.enqueueWriteBuffer(bufRand, true, 0, bufSize, UIrand);
+        outBuffer = new Uint8Array(bufSize);
 
-  time = new Date().getTime();
-  setInterval(fr, 500);
-  anim();
+    } catch (e) {
+        console.error("ERROR: " + e.message, e);
+        throw e;
+    }
+
+    canvas = document.getElementById("c");
+    init_gl();
+
+    time = new Date().getTime();
+    setInterval(fr, 500);
+    anim();
 }
 
 function initSpinBuffer() {
-  var spin = new Float32Array(elemNumber);
-  for ( var i = 0; i < elemNumber;  i++ ) spin[i] = Math.random();
-  cmdQueue.enqueueWriteBuffer(bSpin, true, 0, bufSize, spin);
+    var spin = new Float32Array(elemNumber);
+    var i;
+    for (i = 0; i < elemNumber; i++) {
+        spin[i] = Math.random();
+    }
+    cmdQueue.enqueueWriteBuffer(bSpin, true, 0, bufSize, spin);
 }
 
-function step(){
-  for ( var i = 0; i < it;  i++ ){
-   kSpin.setArg(2, 0, WebCLKernelArgumentTypes.INT);
-   cmdQueue.enqueueNDRangeKernel(kSpin, 0, GLOBAL_WORK_SIZE, LOCAL_WORK_SIZE);
-   cmdQueue.flush();
+function step() {
+    var i;
+    for (i = 0; i < it; i++) {
+        kSpin.setArg(2, 0, WebCLKernelArgumentTypes.INT);
+        cmdQueue.enqueueNDRangeKernel(kSpin, 0, GLOBAL_WORK_SIZE, LOCAL_WORK_SIZE);
+        cmdQueue.flush();
 
-   kSpin.setArg(2, 1, WebCLKernelArgumentTypes.INT);
-   cmdQueue.enqueueNDRangeKernel(kSpin, 0, GLOBAL_WORK_SIZE, LOCAL_WORK_SIZE);
-   cmdQueue.flush();
-  }
-  cmdQueue.enqueueNDRangeKernel(kPix, 0, GLOBAL_WORK_SIZE, LOCAL_WORK_SIZE);
-  cmdQueue.enqueueReadBuffer(bufPix, true, 0, bufSize, outBuffer);
-  cmdQueue.finish();
-  gl.bindTexture(gl.TEXTURE_2D, tex_gl);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, n, n*n, 0, gl.RGBA, gl.UNSIGNED_BYTE, outBuffer);
-  draw();
-  frames++;
+        kSpin.setArg(2, 1, WebCLKernelArgumentTypes.INT);
+        cmdQueue.enqueueNDRangeKernel(kSpin, 0, GLOBAL_WORK_SIZE, LOCAL_WORK_SIZE);
+        cmdQueue.flush();
+    }
+    cmdQueue.enqueueNDRangeKernel(kPix, 0, GLOBAL_WORK_SIZE, LOCAL_WORK_SIZE);
+    cmdQueue.enqueueReadBuffer(bufPix, true, 0, bufSize, outBuffer);
+    cmdQueue.finish();
+    gl.bindTexture(gl.TEXTURE_2D, tex_gl);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, n, n * n, 0, gl.RGBA, gl.UNSIGNED_BYTE, outBuffer);
+    draw();
+    frames++;
 }
-function anim(){
-   step();
-   switch ( animation ){
-     case "reset":
-       initSpinBuffer();
-       animation = "animate";
-     case "animate":
-       if (delay == 0) requestAnimFrame(anim);
-       else setTimeout("requestAnimFrame(anim)", delay);
-       break;
-     case "stop":
-       break;
-   }
+
+function doAnim() {
+    if (delay === 0) {
+        requestAnimationFrame(anim);
+    } else {
+        setTimeout("requestAnimFrame(anim)", delay);
+    }
 }
+
+function anim() {
+    step();
+    switch (animation) {
+    case "reset":
+        initSpinBuffer();
+        animation = "animate";
+        doAnim();
+        break;
+    case "animate":
+        doAnim();
+        break;
+    case "stop":
+        break;
+    }
+}
+
 function run(v) {
-  if( animation == "animate" ){
-    animation = "stop";
-    document.getElementById('runBtn').value = "Run ";}
-  else{
-    animation = "animate";
-    document.getElementById('runBtn').value = "Stop";
-    anim();
-  }
+    if (animation === "animate") {
+        animation = "stop";
+        document.getElementById('runBtn').value = "Run ";
+    } else {
+        animation = "animate";
+        document.getElementById('runBtn').value = "Stop";
+        anim();
+    }
 }
+
 function reset() {
-  if( animation == "stop" ){
-    animation = "reset";
-    document.getElementById('runBtn').value = "Stop";
-    anim();}
-  else animation = "reset";
+    if (animation === "stop") {
+        animation = "reset";
+        document.getElementById('runBtn').value = "Stop";
+        anim();
+    } else {
+        animation = "reset";
+    }
 }
+
 function setDelay(val) {
-  delay = parseInt(val);
+    delay = parseInt(val, 10);
 }
-function fr(){
-  var ti = new Date().getTime();
-  var fps = Math.round(1000*frames/(ti - time));
-  document.getElementById("framerate").value = fps;
-  frames = 0;  time = ti;
+
+function fr() {
+    var ti = new Date().getTime();
+    var fps = Math.round(1000 * frames / (ti - time));
+    document.getElementById("framerate").value = fps;
+    frames = 0;
+    time = ti;
 }
-function setT(v){
-  var T = v.valueOf();
-  kSpin.setArg (3, 1/T, WebCLKernelArgumentTypes.FLOAT);
+
+function setT(v) {
+    var T = v.valueOf();
+    kSpin.setArg(3, 1 / T, WebCLKernelArgumentTypes.FLOAT);
 }
-function setPsize(v){
-   gl.uniform1f( gl.getUniformLocation(prog, "pSize"), v.valueOf());
-   draw();
+
+function setPsize(v) {
+    gl.uniform1f(gl.getUniformLocation(prog, "pSize"), v.valueOf());
+    draw();
 }
+
 function setSpin(v) {
-   gl.uniform1i( gl.getUniformLocation(prog, "spin"), v);
-   draw();
+    gl.uniform1i(gl.getUniformLocation(prog, "spin"), v);
+    draw();
 }
+
 function setIt(val) {
-  it = parseInt(val);
+    it = parseInt(val, 10);
 }
 </script>
 <style type="text/css">
-  H1{ font-size: 120%; color: green}
-  H2{ font-size: 100%; color: green}
-  pre{ color: darkblue}
+  h1{ font-size: 120%; color: green; }
+  h2{ font-size: 100%; color: green; }
+  pre{ color: darkblue; }
 </style>
-</head><body onload="CL_rand ()" onresize="canvas.resize()">
+</head><body onload="randCL();" onresize="canvas.resize();">
 
 <p id="output"></p>
 <canvas id="c" width="512" height="512"></canvas>
-<br><button onclick="reset()">Reset</button>
-<input type="button" onclick="run()" value="Stop" size="1" id="runBtn">
-T<input size="4" value="0.02" onchange="setT( this.value )">
-It<input size="1" value="10" onchange="setIt( this.value )">
-spin<input type="checkbox" onclick="setSpin(checked)" checked>
-size<input size="1" value="5" onchange="setPsize( this.value )">
-delay<input size="2" value="0" onchange="setDelay( this.value )">
-fps<input size="2" id="framerate">
+<br><button onclick="reset();">Reset</button>
+<input type="button" onclick="run();" value="Stop" size="1" id="runBtn">
+T<input type="text" size="4" value="0.02" onchange="setT(this.value);">
+It<input type="text" size="1" value="10" onchange="setIt(this.value);">
+spin<input type="checkbox" onclick="setSpin(checked);" checked>
+size<input type="text" size="1" value="5" onchange="setPsize(this.value);">
+delay<input type="text" size="2" value="0" onchange="setDelay(this.value);">
+fps<input type="text" size="2" id="framerate">
 
 <br>Drag mouse to rotate model. Hold <i>shift</i> key or use mouse wheel
 to zoom it (canvas is matched to the browser window). <i>it</i> is the number
