@@ -9,7 +9,7 @@
 <script src="../common/webcl.js" type="text/javascript"></script>
 
 <script id="clProgramMandelbrot" type="text/x-opencl">
-/*
+
 int iClamp(int i)
 {
   return min(max(0, i), 255);
@@ -184,7 +184,7 @@ __kernel void ckMandelbrot(__global uchar4* col,
        iClamp( 512 - (int)abs(c - 1024) ),
        255);
     }
-  }*/
+  }
 </script>
 
 <script type="text/javascript">
