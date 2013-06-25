@@ -137,6 +137,14 @@ function draw() {
     frames++;
 }
 
+function doAnim() {
+    if (delay === 0) {
+        requestAnimationFrame(anim);
+    } else {
+        setTimeout("requestAnimationFrame(anim)", delay);
+    }
+}
+
 function anim() {
     draw();
     switch (animation) {
@@ -144,13 +152,10 @@ function anim() {
         initInputArray(data);
         cmdQueue.enqueueWriteBuffer(b0, true, 0, 4 * bufSize, data);
         animation = "animate";
+        doAnim();
         break;
     case "animate":
-        if (delay === 0) {
-            requestAnimationFrame(anim);
-        } else {
-            setTimeout("requestAnimationFrame(anim)", delay);
-        }
+        doAnim();
         break;
     case "stop":
         break;
