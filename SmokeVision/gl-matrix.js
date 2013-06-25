@@ -27,12 +27,12 @@
  *    distribution.
  */
 
-"use strict";
-
 // Type declarations
-(function() {
+(function () {
+    "use strict";
+
     // account for CommonJS environments
-    var _global = (typeof(exports) != 'undefined') ? global : window;
+    var _global = (window.exports !== undefined) ? global : window;
     _global.glMatrixArrayType = _global.MatrixArray = null;
 
     /**
@@ -60,18 +60,19 @@
     _global.quat4 = {};
 
     // explicitly sets and returns the type of array to use within glMatrix
-    _global.setMatrixArrayType = function(type) {
-        return glMatrixArrayType = MatrixArray = type;
+    _global.setMatrixArrayType = function (type) {
+        glMatrixArrayType = MatrixArray = type;
+        return type;
     };
 
     // auto-detects and returns the best type of array to use within glMatrix, falling
     // back to Array if typed arrays are unsupported
-    _global.determineMatrixArrayType = function() {
-        return setMatrixArrayType((typeof Float32Array !== 'undefined') ? Float32Array : Array);
+    _global.determineMatrixArrayType = function () {
+        return setMatrixArrayType(Float32Array !== 'undefined' ? Float32Array : Array);
     };
 
     determineMatrixArrayType();
-})();
+}());
 
 /*
  * vec3
@@ -244,7 +245,9 @@ vec3.normalize = function (vec, dest) {
         dest[1] = 0;
         dest[2] = 0;
         return dest;
-    } else if (len === 1) {
+    }
+
+    if (len === 1) {
         dest[0] = x;
         dest[1] = y;
         dest[2] = z;
@@ -368,7 +371,7 @@ vec3.dist = function (vec, vec2) {
         y = vec2[1] - vec[1],
         z = vec2[2] - vec[2];
 
-    return Math.sqrt(x*x + y*y + z*z);
+    return Math.sqrt((x * x) + (y * y) + (z * z));
 };
 
 /**
@@ -395,10 +398,14 @@ vec3.unproject = function (vec, view, proj, viewport, dest) {
     v[3] = 1.0;
 
     mat4.multiply(proj, view, m);
-    if(!mat4.inverse(m)) { return null; }
+    if (!mat4.inverse(m)) {
+        return null;
+    }
 
     mat4.multiplyVec4(m, v);
-    if(v[3] === 0.0) { return null; }
+    if (v[3] === 0.0) {
+        return null;
+    }
 
     dest[0] = v[0] / v[3];
     dest[1] = v[1] / v[3];
@@ -771,8 +778,11 @@ mat4.inverse = function (mat, dest) {
         invDet;
 
         // Calculate the determinant
-        if (!d) { return null; }
-        invDet = 1 / d;
+    if (!d) {
+        return null;
+    }
+
+    invDet = 1 / d;
 
     dest[0] = (a11 * b11 - a12 * b10 + a13 * b09) * invDet;
     dest[1] = (-a01 * b11 + a02 * b10 - a03 * b09) * invDet;
@@ -1000,18 +1010,37 @@ mat4.translate = function (mat, vec, dest) {
         return mat;
     }
 
-    a00 = mat[0]; a01 = mat[1]; a02 = mat[2]; a03 = mat[3];
-    a10 = mat[4]; a11 = mat[5]; a12 = mat[6]; a13 = mat[7];
-    a20 = mat[8]; a21 = mat[9]; a22 = mat[10]; a23 = mat[11];
+    a00 = mat[0];
+    a01 = mat[1];
+    a02 = mat[2];
+    a03 = mat[3];
+    a10 = mat[4];
+    a11 = mat[5];
+    a12 = mat[6];
+    a13 = mat[7];
+    a20 = mat[8];
+    a21 = mat[9];
+    a22 = mat[10];
+    a23 = mat[11];
 
-    dest[0] = a00; dest[1] = a01; dest[2] = a02; dest[3] = a03;
-    dest[4] = a10; dest[5] = a11; dest[6] = a12; dest[7] = a13;
-    dest[8] = a20; dest[9] = a21; dest[10] = a22; dest[11] = a23;
+    dest[0] = a00;
+    dest[1] = a01;
+    dest[2] = a02;
+    dest[3] = a03;
+    dest[4] = a10;
+    dest[5] = a11;
+    dest[6] = a12;
+    dest[7] = a13;
+    dest[8] = a20;
+    dest[9] = a21;
+    dest[10] = a22;
+    dest[11] = a23;
 
     dest[12] = a00 * x + a10 * y + a20 * z + mat[12];
     dest[13] = a01 * x + a11 * y + a21 * z + mat[13];
     dest[14] = a02 * x + a12 * y + a22 * z + mat[14];
     dest[15] = a03 * x + a13 * y + a23 * z + mat[15];
+
     return dest;
 };
 
@@ -1096,14 +1125,29 @@ mat4.rotate = function (mat, angle, axis, dest) {
     c = Math.cos(angle);
     t = 1 - c;
 
-    a00 = mat[0]; a01 = mat[1]; a02 = mat[2]; a03 = mat[3];
-    a10 = mat[4]; a11 = mat[5]; a12 = mat[6]; a13 = mat[7];
-    a20 = mat[8]; a21 = mat[9]; a22 = mat[10]; a23 = mat[11];
+    a00 = mat[0];
+    a01 = mat[1];
+    a02 = mat[2];
+    a03 = mat[3];
+    a10 = mat[4];
+    a11 = mat[5];
+    a12 = mat[6];
+    a13 = mat[7];
+    a20 = mat[8];
+    a21 = mat[9];
+    a22 = mat[10];
+    a23 = mat[11];
 
     // Construct the elements of the rotation matrix
-    b00 = x * x * t + c; b01 = y * x * t + z * s; b02 = z * x * t - y * s;
-    b10 = x * y * t - z * s; b11 = y * y * t + c; b12 = z * y * t + x * s;
-    b20 = x * z * t + y * s; b21 = y * z * t - x * s; b22 = z * z * t + c;
+    b00 = x * x * t + c;
+    b01 = y * x * t + z * s;
+    b02 = z * x * t - y * s;
+    b10 = x * y * t - z * s;
+    b11 = y * y * t + c;
+    b12 = z * y * t + x * s;
+    b20 = x * z * t + y * s;
+    b21 = y * z * t - x * s;
+    b22 = z * z * t + c;
 
     if (!dest) {
         dest = mat;
@@ -1603,8 +1647,8 @@ quat4.calculateW = function (quat, dest) {
  *
  * @return {number} Dot product of quat and quat2
  */
-quat4.dot = function(quat, quat2){
-    return quat[0]*quat2[0] + quat[1]*quat2[1] + quat[2]*quat2[2] + quat[3]*quat2[3];
+quat4.dot = function (quat, quat2) {
+    return quat[0] * quat2[0] + quat[1] * quat2[1] + quat[2] * quat2[2] + quat[3] * quat2[3];
 };
 
 /**
@@ -1615,24 +1659,24 @@ quat4.dot = function(quat, quat2){
  *
  * @returns {quat4} dest if specified, quat otherwise
  */
-quat4.inverse = function(quat, dest) {
+quat4.inverse = function (quat, dest) {
     var q0 = quat[0], q1 = quat[1], q2 = quat[2], q3 = quat[3],
-        dot = q0*q0 + q1*q1 + q2*q2 + q3*q3,
-        invDot = dot ? 1.0/dot : 0;
+        dot = q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3,
+        invDot = dot ? 1.0 / dot : 0;
 
     // TODO: Would be faster to return [0,0,0,0] immediately if dot == 0
 
-    if(!dest || quat === dest) {
+    if (!dest || quat === dest) {
         quat[0] *= -invDot;
         quat[1] *= -invDot;
         quat[2] *= -invDot;
         quat[3] *= invDot;
         return quat;
     }
-    dest[0] = -quat[0]*invDot;
-    dest[1] = -quat[1]*invDot;
-    dest[2] = -quat[2]*invDot;
-    dest[3] = quat[3]*invDot;
+    dest[0] = -quat[0] * invDot;
+    dest[1] = -quat[1] * invDot;
+    dest[2] = -quat[2] * invDot;
+    dest[3] = quat[3] * invDot;
     return dest;
 };
 

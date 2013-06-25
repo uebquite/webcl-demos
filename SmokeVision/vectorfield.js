@@ -1,5 +1,7 @@
 function VectorField(dim, viscosity, dt, boundaries) {
-    this.field = new Float32Array(getFlatSize(dim)*3);
+    var i, j, k;
+
+    this.field = new Float32Array(getFlatSize(dim) * 3);
 
     this.dim = dim;
     this.viscosity = viscosity;
@@ -7,59 +9,60 @@ function VectorField(dim, viscosity, dt, boundaries) {
     this.slip = true;
     this.vorticityScale = 3.0;
 
-    for(var i = 0; i < this.dim+2; i++) {
-        for(var j = 0; j < this.dim+2; j++) {
-            for(var k = 0; k < this.dim+2; k++) {
-                this.field[vindex(i,j,k,0,dim)] = 0.0;
-                this.field[vindex(i,j,k,1,dim)] = 0.0;
-                this.field[vindex(i,j,k,2,dim)] = 0.0;
+    for (i = 0; i < this.dim + 2; i++) {
+        for (j = 0; j < this.dim + 2; j++) {
+            for (k = 0; k < this.dim + 2; k++) {
+                this.field[vindex(i, j, k, 0, dim)] = 0.0;
+                this.field[vindex(i, j, k, 1, dim)] = 0.0;
+                this.field[vindex(i, j, k, 2, dim)] = 0.0;
             }
         }
     }
 }
 
-VectorField.prototype.setTimestep = function(value) {
+VectorField.prototype.setTimestep = function (value) {
     this.dt = value;
-}
+};
 
-VectorField.prototype.setViscosity = function(value) {
+VectorField.prototype.setViscosity = function (value) {
     this.viscosity = value;
-}
+};
 
-VectorField.prototype.reset = function() {
+VectorField.prototype.reset = function () {
     var bufSize = 4 * numCells;
+    var i, j, k;
 
-    for(var i = 0; i < this.dim+2; i++) {
-        for(var j = 0; j < this.dim+2; j++) {
-            for(var k = 0; k < this.dim+2; k++) {
-                this.field[vindex(i,j,k,0,dim)] = 0.0;
-                this.field[vindex(i,j,k,1,dim)] = 0.0;
-                this.field[vindex(i,j,k,2,dim)] = 0.0;
+    for (i = 0; i < this.dim + 2; i++) {
+        for (j = 0; j < this.dim + 2; j++) {
+            for (k = 0; k < this.dim + 2; k++) {
+                this.field[vindex(i, j, k, 0, dim)] = 0.0;
+                this.field[vindex(i, j, k, 1, dim)] = 0.0;
+                this.field[vindex(i, j, k, 2, dim)] = 0.0;
             }
         }
     }
 
-    clQueue.enqueueWriteBuffer(vectorBuffer, false, 0, bufSize*3, this.getField(), []);
-}
+    clQueue.enqueueWriteBuffer(vectorBuffer, false, 0, bufSize * 3, this.getField(), []);
+};
 
-VectorField.prototype.getField = function() {
+VectorField.prototype.getField = function () {
     return this.field;
-}
+};
 
-VectorField.prototype.draw = function() {
+VectorField.prototype.draw = function () {
 
-}
+};
 
-VectorField.prototype.step = function(source) {
+VectorField.prototype.step = function (source) {
     this.addField(source);
     this.vorticityConfinement();
     this.diffusion();
     this.projection();
     this.advection();
     this.projection();
-}
+};
 
-VectorField.prototype.addField = function(source) {
+VectorField.prototype.addField = function (source) {
 
     vectorAddKernel.setArg(0, vectorBuffer);
     vectorAddKernel.setArg(1, vectorSourceBuffer);
@@ -74,14 +77,13 @@ VectorField.prototype.addField = function(source) {
         clQueue.enqueueNDRangeKernel(vectorAddKernel, null, globalWS, null);
         clQueue.finish();
         clTime += Date.now() - start;
-    }
-    catch(e) {
+    } catch (e) {
         console.innerHTML = e;
         console.log("vectorField.addField", [e]);
     }
-}
+};
 
-VectorField.prototype.diffusion = function() {
+VectorField.prototype.diffusion = function () {
     var globalWS = new Int32Array(3);
     globalWS[0] = globalWS[1] = globalWS[2] = localThreads;
 
@@ -100,19 +102,19 @@ VectorField.prototype.diffusion = function() {
         vectorDiffusionKernel.setArg(3, this.dt, WebCLKernelArgumentTypes.FLOAT);
         vectorDiffusionKernel.setArg(4, this.viscosity, WebCLKernelArgumentTypes.FLOAT);
 
-        var start = Date.now();
+        start = Date.now();
         clQueue.enqueueNDRangeKernel(vectorDiffusionKernel, null, globalWS, null);
         clTime += Date.now() - start;
-    }
-    catch(e) {
+    } catch (e) {
         console.error("vectorField.diffusion", [e]);
     }
 
     this.setBoundaryVelocities();
-}
+};
 
-VectorField.prototype.projection = function() {
+VectorField.prototype.projection = function () {
     var globalWS = new Int32Array(3);
+    var i;
     globalWS[0] = globalWS[1] = globalWS[2] = localThreads;
 
     try {
@@ -126,7 +128,7 @@ VectorField.prototype.projection = function() {
         vectorInitFieldKernel.setArg(0, scalarSecondTempBuffer);
         vectorInitFieldKernel.setArg(1, this.dim, WebCLKernelArgumentTypes.UINT);
 
-        var start = Date.now();
+        start = Date.now();
         clQueue.enqueueNDRangeKernel(vectorInitFieldKernel, null, globalWS, null);
         clTime += Date.now() - start;
 
@@ -134,23 +136,23 @@ VectorField.prototype.projection = function() {
         vectorProjectionFirst.setArg(1, scalarTempBuffer);
         vectorProjectionFirst.setArg(2, scalarSecondTempBuffer);
         vectorProjectionFirst.setArg(3, this.dim, WebCLKernelArgumentTypes.UINT);
-        vectorProjectionFirst.setArg(4, 1/this.dim, WebCLKernelArgumentTypes.FLOAT);
+        vectorProjectionFirst.setArg(4, 1 / this.dim, WebCLKernelArgumentTypes.FLOAT);
 
-        var start = Date.now();
+        start = Date.now();
         clQueue.enqueueNDRangeKernel(vectorProjectionFirst, null, globalWS, null);
         clTime += Date.now() - start;
 
         this.setScalarFieldDensities(scalarTempBuffer);
         this.setScalarFieldDensities(scalarSecondTempBuffer);
 
-        for(var i = 0; i < 20; i++) {
+        for (i = 0; i < 20; i++) {
             vectorProjectionSecond.setArg(0, vectorBuffer);
             vectorProjectionSecond.setArg(1, scalarTempBuffer);
             vectorProjectionSecond.setArg(2, scalarSecondTempBuffer);
             vectorProjectionSecond.setArg(3, this.dim, WebCLKernelArgumentTypes.UINT);
-            vectorProjectionSecond.setArg(4, 1/this.dim, WebCLKernelArgumentTypes.FLOAT);
+            vectorProjectionSecond.setArg(4, 1 / this.dim, WebCLKernelArgumentTypes.FLOAT);
 
-            var start = Date.now();
+            start = Date.now();
             clQueue.enqueueNDRangeKernel(vectorProjectionSecond, null, globalWS, null);
             clTime += Date.now() - start;
 
@@ -161,20 +163,19 @@ VectorField.prototype.projection = function() {
         vectorProjectionThird.setArg(1, scalarTempBuffer);
         vectorProjectionThird.setArg(2, scalarSecondTempBuffer);
         vectorProjectionThird.setArg(3, this.dim, WebCLKernelArgumentTypes.UINT);
-        vectorProjectionThird.setArg(4, 1/this.dim, WebCLKernelArgumentTypes.FLOAT);
+        vectorProjectionThird.setArg(4, 1 / this.dim, WebCLKernelArgumentTypes.FLOAT);
 
-        var start = Date.now();
+        start = Date.now();
         clQueue.enqueueNDRangeKernel(vectorProjectionThird, null, globalWS, null);
         clTime += Date.now() - start;
 
         this.setBoundaryVelocities();
-    }
-    catch(e) {
+    } catch (e) {
         console.error("vectorField.projection", [e]);
     }
-}
+};
 
-VectorField.prototype.advection = function() {
+VectorField.prototype.advection = function () {
     var globalWS = new Int32Array(3);
     globalWS[0] = globalWS[1] = globalWS[2] = localThreads;
 
@@ -192,19 +193,18 @@ VectorField.prototype.advection = function() {
         vectorAdvectionKernel.setArg(2, this.dim, WebCLKernelArgumentTypes.UINT);
         vectorAdvectionKernel.setArg(3, this.dt, WebCLKernelArgumentTypes.FLOAT);
 
-        var start = Date.now();
+        start = Date.now();
         clQueue.enqueueNDRangeKernel(vectorAdvectionKernel, null, globalWS, null);
         clTime += Date.now() - start;
-    }
-    catch(e) {
+    } catch (e) {
         console.error("vectorField.advection", [e]);
     }
 
     this.setBoundaryVelocities();
-}
+};
 
 
-VectorField.prototype.vorticityConfinement = function() {
+VectorField.prototype.vorticityConfinement = function () {
     var globalWS = new Int32Array(3);
     globalWS[0] = globalWS[1] = globalWS[2] = localThreads;
 
@@ -223,7 +223,7 @@ VectorField.prototype.vorticityConfinement = function() {
         vectorVorticityFirstKernel.setArg(3, this.dim, WebCLKernelArgumentTypes.UINT);
         vectorVorticityFirstKernel.setArg(4, this.dt * this.vorticityScale, WebCLKernelArgumentTypes.FLOAT);
 
-        var start = Date.now();
+        start = Date.now();
         clQueue.enqueueNDRangeKernel(vectorVorticityFirstKernel, null, globalWS, null);
         clTime += Date.now() - start;
 
@@ -233,16 +233,15 @@ VectorField.prototype.vorticityConfinement = function() {
         vectorVorticitySecondKernel.setArg(3, this.dim, WebCLKernelArgumentTypes.UINT);
         vectorVorticitySecondKernel.setArg(4, this.dt * this.vorticityScale, WebCLKernelArgumentTypes.FLOAT);
 
-        var start = Date.now();
+        start = Date.now();
         clQueue.enqueueNDRangeKernel(vectorVorticitySecondKernel, null, globalWS, null);
         clTime += Date.now() - start;
-    }
-    catch(e) {
+    } catch (e) {
         console.error("vectorField.vorticityConfinement", [e]);
     }
-}
+};
 
-VectorField.prototype.setBoundaryVelocities = function() {
+VectorField.prototype.setBoundaryVelocities = function () {
     var globalWS = new Int32Array(3);
     globalWS[0] = globalWS[1] = globalWS[2] = localThreads;
 
@@ -253,13 +252,12 @@ VectorField.prototype.setBoundaryVelocities = function() {
         var start = Date.now();
         clQueue.enqueueNDRangeKernel(vectorBoundariesKernel, null, globalWS, null);
         clTime += Date.now() - start;
-    }
-    catch(e) {
+    } catch (e) {
         console.error("vectorField.setBoundaryVelocities", [e]);
     }
-}
+};
 
-VectorField.prototype.setScalarFieldDensities = function(field) {
+VectorField.prototype.setScalarFieldDensities = function (field) {
     var globalWS = new Int32Array(3);
     globalWS[0] = globalWS[1] = globalWS[2] = localThreads;
 
@@ -270,8 +268,7 @@ VectorField.prototype.setScalarFieldDensities = function(field) {
         var start = Date.now();
         clQueue.enqueueNDRangeKernel(scalarBoundariesKernel, null, globalWS, null);
         clTime += Date.now() - start;
-    }
-    catch(e) {
+    } catch (e) {
         console.error("vectorField.setScalarFieldDensities", [e]);
     }
-}
+};

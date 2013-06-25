@@ -28,10 +28,10 @@
 //
 // Initialize the Canvas element with the passed name as a WebGL object and return the
 // WebGLRenderingContext.
-function initWebGL(canvasName, vshader, fshader, attribs, clearColor, clearDepth)
-{
+
+function initWebGL(canvasName, vshader, fshader, attribs, clearColor, clearDepth) {
     var canvas = document.getElementById(canvasName);
-    return gl = WebGLUtils.setupWebGL(canvas);
+    return WebGLUtils.setupWebGL(canvas);
 }
 
 function log(msg) {
@@ -40,86 +40,25 @@ function log(msg) {
     }
 }
 
-// Load shaders with the passed names and create a program with them. Return this program
-// in the 'program' property of the returned context.
 //
-// For each string in the passed attribs array, bind an attrib with that name at that index.
-// Once the attribs are bound, link the program and then use it.
+//loadShader
 //
-// Set the clear color to the passed array (4 values) and set the clear depth to the passed value.
-// Enable depth testing and blending with a blend func of (SRC_ALPHA, ONE_MINUS_SRC_ALPHA)
+//'shaderId' is the id of a <script> element containing the shader source string.
+//Load this shader and return the WebGLShader object corresponding to it.
 //
-// A console function is added to the context: console(string). This can be replaced
-// by the caller. By default, it maps to the window.console() function on WebKit and to
-// an empty function on other browsers.
-//
-function simpleSetup(gl, vshader, fshader, attribs, clearColor, clearDepth)
-{
-
-    // create our shaders
-    var vertexShader = loadShader(gl, vshader);
-    var fragmentShader = loadShader(gl, fshader);
-
-    // Create the program object
-    var program = gl.createProgram();
-
-    // Attach our two shaders to the program
-    gl.attachShader (program, vertexShader);
-    gl.attachShader (program, fragmentShader);
-
-    // Bind attributes
-    for (var i = 0; i < attribs.length; ++i)
-        gl.bindAttribLocation (program, i, attribs[i]);
-
-    // Link the program
-    gl.linkProgram(program);
-
-    // Check the link status
-    var linked = gl.getProgramParameter(program, gl.LINK_STATUS);
-    if (!linked && !gl.isContextLost()) {
-        // something went wrong with the link
-        var error = gl.getProgramInfoLog (program);
-
-        gl.deleteProgram(program);
-        gl.deleteProgram(fragmentShader);
-        gl.deleteProgram(vertexShader);
-
-        return null;
-    }
-
-
-    gl.useProgram(program);
-
-    gl.clearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
-    gl.clearDepth(clearDepth);
-
-    gl.enable(gl.DEPTH_TEST);
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
-    return program;
-}
-
-//
-// loadShader
-//
-// 'shaderId' is the id of a <script> element containing the shader source string.
-// Load this shader and return the WebGLShader object corresponding to it.
-//
-function loadShader(ctx, shaderId)
-{
-    var shaderScript = document.getElementById(shaderId);
+function loadShader(ctx, shaderId) {
+    var shaderScript = document.getElementById(shaderId), shaderType;
     if (!shaderScript) {
-        log("*** Error: shader script '"+shaderId+"' not found");
+        log("*** Error: shader script '" + shaderId + "' not found");
         return null;
     }
 
-    if (shaderScript.type == "x-shader/x-vertex")
-        var shaderType = ctx.VERTEX_SHADER;
-    else if (shaderScript.type == "x-shader/x-fragment")
-        var shaderType = ctx.FRAGMENT_SHADER;
-    else {
-        log("*** Error: shader script '"+shaderId+"' of undefined type '"+shaderScript.type+"'");
+    if (shaderScript.type === "x-shader/x-vertex") {
+        shaderType = ctx.VERTEX_SHADER;
+    } else if (shaderScript.type === "x-shader/x-fragment") {
+        shaderType = ctx.FRAGMENT_SHADER;
+    } else {
+        log("*** Error: shader script '" + shaderId + "' of undefined type '" + shaderScript.type + "'");
         return null;
     }
 
@@ -145,6 +84,68 @@ function loadShader(ctx, shaderId)
     return shader;
 }
 
+// Load shaders with the passed names and create a program with them. Return this program
+// in the 'program' property of the returned context.
+//
+// For each string in the passed attribs array, bind an attrib with that name at that index.
+// Once the attribs are bound, link the program and then use it.
+//
+// Set the clear color to the passed array (4 values) and set the clear depth to the passed value.
+// Enable depth testing and blending with a blend func of (SRC_ALPHA, ONE_MINUS_SRC_ALPHA)
+//
+// A console function is added to the context: console(string). This can be replaced
+// by the caller. By default, it maps to the window.console() function on WebKit and to
+// an empty function on other browsers.
+//
+function simpleSetup(gl, vshader, fshader, attribs, clearColor, clearDepth) {
+
+    var i;
+
+    // create our shaders
+    var vertexShader = loadShader(gl, vshader);
+    var fragmentShader = loadShader(gl, fshader);
+
+    // Create the program object
+    var program = gl.createProgram();
+
+    // Attach our two shaders to the program
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+
+    // Bind attributes
+    for (i = 0; i < attribs.length; ++i) {
+        gl.bindAttribLocation(program, i, attribs[i]);
+    }
+
+    // Link the program
+    gl.linkProgram(program);
+
+    // Check the link status
+    var linked = gl.getProgramParameter(program, gl.LINK_STATUS);
+    if (!linked && !gl.isContextLost()) {
+        // something went wrong with the link
+        var error = gl.getProgramInfoLog(program);
+
+        gl.deleteProgram(program);
+        gl.deleteProgram(fragmentShader);
+        gl.deleteProgram(vertexShader);
+
+        return null;
+    }
+
+
+    gl.useProgram(program);
+
+    gl.clearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
+    gl.clearDepth(clearDepth);
+
+    gl.enable(gl.DEPTH_TEST);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+    return program;
+}
+
 //
 // makeBox
 //
@@ -157,8 +158,7 @@ function loadShader(ctx, shaderId)
 //  indexObject         WebGLBuffer object for indices
 //  numIndices          The number of indices in the indexObject
 //
-function makeBox(ctx)
-{
+function makeBox(ctx) {
     // box
     //    v6----- v5
     //   /|      /|
@@ -169,6 +169,7 @@ function makeBox(ctx)
     //  v2------v3
     //
     // vertex coords array
+    /*jslint white:true */
     var vertices = new Float32Array(
         [  1, 1, 1,  -1, 1, 1,  -1,-1, 1,   1,-1, 1,    // v0-v1-v2-v3 front
            1, 1, 1,   1,-1, 1,   1,-1,-1,   1, 1,-1,    // v0-v3-v4-v5 right
@@ -177,8 +178,10 @@ function makeBox(ctx)
           -1,-1,-1,   1,-1,-1,   1,-1, 1,  -1,-1, 1,    // v7-v4-v3-v2 bottom
            1,-1,-1,  -1,-1,-1,  -1, 1,-1,   1, 1,-1 ]   // v4-v7-v6-v5 back
     );
+    /*jslint white:false */
 
     // normal array
+    /*jslint white:true */
     var normals = new Float32Array(
         [  0, 0, 1,   0, 0, 1,   0, 0, 1,   0, 0, 1,     // v0-v1-v2-v3 front
            1, 0, 0,   1, 0, 0,   1, 0, 0,   1, 0, 0,     // v0-v3-v4-v5 right
@@ -187,9 +190,11 @@ function makeBox(ctx)
            0,-1, 0,   0,-1, 0,   0,-1, 0,   0,-1, 0,     // v7-v4-v3-v2 bottom
            0, 0,-1,   0, 0,-1,   0, 0,-1,   0, 0,-1 ]    // v4-v7-v6-v5 back
        );
+    /*jslint white:false */
 
 
     // texCoord array
+    /*jslint white:true */
     var texCoords = new Float32Array(
         [  1, 1,   0, 1,   0, 0,   1, 0,    // v0-v1-v2-v3 front
            0, 1,   0, 0,   1, 0,   1, 1,    // v0-v3-v4-v5 right
@@ -198,8 +203,10 @@ function makeBox(ctx)
            0, 0,   1, 0,   1, 1,   0, 1,    // v7-v4-v3-v2 bottom
            0, 0,   1, 0,   1, 1,   0, 1 ]   // v4-v7-v6-v5 back
        );
+    /*jslint white:false */
 
     // index array
+    /*jslint white:true */
     var indices = new Uint8Array(
         [  0, 1, 2,   0, 2, 3,    // front
            4, 5, 6,   4, 6, 7,    // right
@@ -208,6 +215,7 @@ function makeBox(ctx)
           16,17,18,  16,18,19,    // bottom
           20,21,22,  20,22,23 ]   // back
       );
+    /*jslint white:false */
 
     var retval = { };
 
@@ -248,15 +256,15 @@ function makeBox(ctx)
 //  indexObject         WebGLBuffer object for indices
 //  numIndices          The number of indices in the indexObject
 //
-function makeSphere(ctx, radius, lats, longs)
-{
+function makeSphere(ctx, radius, lats, longs) {
     var geometryData = [ ];
     var normalData = [ ];
     var texCoordData = [ ];
     var indexData = [ ];
+    var longNumber, latNumber;
 
-    for (var latNumber = 0; latNumber <= lats; ++latNumber) {
-        for (var longNumber = 0; longNumber <= longs; ++longNumber) {
+    for (latNumber = 0; latNumber <= lats; ++latNumber) {
+        for (longNumber = 0; longNumber <= longs; ++longNumber) {
             var theta = latNumber * Math.PI / lats;
             var phi = longNumber * 2 * Math.PI / longs;
             var sinTheta = Math.sin(theta);
@@ -267,8 +275,8 @@ function makeSphere(ctx, radius, lats, longs)
             var x = cosPhi * sinTheta;
             var y = cosTheta;
             var z = sinPhi * sinTheta;
-            var u = 1-(longNumber/longs);
-            var v = latNumber/lats;
+            var u = 1 - (longNumber / longs);
+            var v = latNumber / lats;
 
             normalData.push(x);
             normalData.push(y);
@@ -281,17 +289,17 @@ function makeSphere(ctx, radius, lats, longs)
         }
     }
 
-    for (var latNumber = 0; latNumber < lats; ++latNumber) {
-        for (var longNumber = 0; longNumber < longs; ++longNumber) {
-            var first = (latNumber * (longs+1)) + longNumber;
+    for (latNumber = 0; latNumber < lats; ++latNumber) {
+        for (longNumber = 0; longNumber < longs; ++longNumber) {
+            var first = (latNumber * (longs + 1)) + longNumber;
             var second = first + longs + 1;
             indexData.push(first);
             indexData.push(second);
-            indexData.push(first+1);
+            indexData.push(first + 1);
 
             indexData.push(second);
-            indexData.push(second+1);
-            indexData.push(first+1);
+            indexData.push(second + 1);
+            indexData.push(first + 1);
         }
     }
 
@@ -323,60 +331,27 @@ var g_loadingObjects = [];
 // Clears all the Objects currently loading.
 // This is used to handle context lost events.
 function clearLoadingObjects() {
-    for (var ii = 0; ii < g_loadingObjects.length; ++ii) {
+    var ii;
+    for (ii = 0; ii < g_loadingObjects.length; ++ii) {
         g_loadingObjects[ii].onreadystatechange = undefined;
     }
     g_loadingObjects = [];
 }
 
-//
-// loadObj
-//
-// Load a .obj file from the passed URL. Return an object with a 'loaded' property set to false.
-// When the object load is complete, the 'loaded' property becomes true and the following
-// properties are set:
-//
-//  normalObject        WebGLBuffer object for normals
-//  texCoordObject      WebGLBuffer object for texCoords
-//  vertexObject        WebGLBuffer object for vertices
-//  indexObject         WebGLBuffer object for indices
-//  numIndices          The number of indices in the indexObject
-//
-function loadObj(ctx, url)
-{
-    var obj = { loaded : false };
-    obj.ctx = ctx;
-    var req = new XMLHttpRequest();
-    req.obj = obj;
-    g_loadingObjects.push(req);
-    req.onreadystatechange = function () { processLoadObj(req) };
-    req.open("GET", url, true);
-    req.send(null);
-    return obj;
-}
+function doLoadObj(obj, text) {
+    /*globals vertexArray: true, normalArray: true, textureArray: true, indexArray: true */
+    vertexArray = [];
+    normalArray = [];
+    textureArray = [];
+    indexArray = [];
 
-function processLoadObj(req)
-{
-    log("req="+req)
-    // only if req shows "complete"
-    if (req.readyState == 4) {
-        g_loadingObjects.splice(g_loadingObjects.indexOf(req), 1);
-        doLoadObj(req.obj, req.responseText);
-    }
-}
-
-function doLoadObj(obj, text)
-{
-    vertexArray = [ ];
-    normalArray = [ ];
-    textureArray = [ ];
-    indexArray = [ ];
-
-    var vertex = [ ];
-    var normal = [ ];
-    var texture = [ ];
-    var facemap = { };
+    var vertex = [];
+    var normal = [];
+    var texture = [];
+    var facemap = {};
     var index = 0;
+
+    var lineIndex = null, i;
 
     // This is a map which associates a range of indices with a name
     // The name comes from the 'g' tag (of the form "g NAME"). Indices
@@ -386,64 +361,57 @@ function doLoadObj(obj, text)
     // whose value is a 2 element array with [<first index>, <num indices>]
     var groups = { };
     var currentGroup = [-1, 0];
-    groups["_unnamed"] = currentGroup;
+    groups._unnamed = currentGroup;
 
     var lines = text.split("\n");
-    for (var lineIndex in lines) {
+    for (lineIndex in lines) {
         var line = lines[lineIndex].replace(/[ \t]+/g, " ").replace(/\s\s*$/, "");
 
         // ignore comments
-        if (line[0] == "#")
-            continue;
+        if (line[0] === "#") { continue; }
 
         var array = line.split(" ");
-        if (array[0] == "g") {
+        if (array[0] === "g") {
             // new group
             currentGroup = [indexArray.length, 0];
             groups[array[1]] = currentGroup;
-        }
-        else if (array[0] == "v") {
+        } else if (array[0] === "v") {
             // vertex
             vertex.push(parseFloat(array[1]));
             vertex.push(parseFloat(array[2]));
             vertex.push(parseFloat(array[3]));
-        }
-        else if (array[0] == "vt") {
+        } else if (array[0] === "vt") {
             // normal
             texture.push(parseFloat(array[1]));
             texture.push(parseFloat(array[2]));
-        }
-        else if (array[0] == "vn") {
+        } else if (array[0] === "vn") {
             // normal
             normal.push(parseFloat(array[1]));
             normal.push(parseFloat(array[2]));
             normal.push(parseFloat(array[3]));
-        }
-        else if (array[0] == "f") {
+        } else if (array[0] === "f") {
             // face
-            if (array.length != 4) {
-                log("*** Error: face '"+line+"' not handled");
+            if (array.length !== 4) {
+                log("*** Error: face '" + line + "' not handled");
                 continue;
             }
 
-            for (var i = 1; i < 4; ++i) {
-                if (!(array[i] in facemap)) {
+            for (i = 1; i < 4; ++i) {
+                if (!(facemap.hasOwnProperty(array[i]))) {
                     // add a new entry to the map and arrays
                     var f = array[i].split("/");
                     var vtx, nor, tex;
 
-                    if (f.length == 1) {
-                        vtx = parseInt(f[0]) - 1;
+                    if (f.length === 1) {
+                        vtx = parseInt(f[0], 10) - 1;
                         nor = vtx;
                         tex = vtx;
-                    }
-                    else if (f.length = 3) {
-                        vtx = parseInt(f[0]) - 1;
-                        tex = parseInt(f[1]) - 1;
-                        nor = parseInt(f[2]) - 1;
-                    }
-                    else {
-                        obj.ctx.console.log("*** Error: did not understand face '"+array[i]+"'");
+                    } else if (f.length === 3) {
+                        vtx = parseInt(f[0], 10) - 1;
+                        tex = parseInt(f[1], 10) - 1;
+                        nor = parseInt(f[2], 10) - 1;
+                    } else {
+                        obj.ctx.console.log("*** Error: did not understand face '" + array[i] + "'");
                         return null;
                     }
 
@@ -452,10 +420,11 @@ function doLoadObj(obj, text)
                     var y = 0;
                     var z = 0;
                     if (vtx * 3 + 2 < vertex.length) {
-                        x = vertex[vtx*3];
-                        y = vertex[vtx*3+1];
-                        z = vertex[vtx*3+2];
+                        x = vertex[vtx * 3];
+                        y = vertex[vtx * 3 + 1];
+                        z = vertex[vtx * 3 + 2];
                     }
+
                     vertexArray.push(x);
                     vertexArray.push(y);
                     vertexArray.push(z);
@@ -464,8 +433,8 @@ function doLoadObj(obj, text)
                     x = 0;
                     y = 0;
                     if (tex * 2 + 1 < texture.length) {
-                        x = texture[tex*2];
-                        y = texture[tex*2+1];
+                        x = texture[tex * 2];
+                        y = texture[tex * 2 + 1];
                     }
                     textureArray.push(x);
                     textureArray.push(y);
@@ -475,10 +444,11 @@ function doLoadObj(obj, text)
                     y = 0;
                     z = 1;
                     if (nor * 3 + 2 < normal.length) {
-                        x = normal[nor*3];
-                        y = normal[nor*3+1];
-                        z = normal[nor*3+2];
+                        x = normal[nor * 3];
+                        y = normal[nor * 3 + 1];
+                        z = normal[nor * 3 + 2];
                     }
+
                     normalArray.push(x);
                     normalArray.push(y);
                     normalArray.push(z);
@@ -515,39 +485,57 @@ function doLoadObj(obj, text)
     obj.loaded = true;
 }
 
+function processLoadObj(req) {
+    log("req=" + req);
+    // only if req shows "complete"
+    if (req.readyState === 4) {
+        g_loadingObjects.splice(g_loadingObjects.indexOf(req), 1);
+        doLoadObj(req.obj, req.responseText);
+    }
+}
+
+//
+//loadObj
+//
+//Load a .obj file from the passed URL. Return an object with a 'loaded' property set to false.
+//When the object load is complete, the 'loaded' property becomes true and the following
+//properties are set:
+//
+//normalObject        WebGLBuffer object for normals
+//texCoordObject      WebGLBuffer object for texCoords
+//vertexObject        WebGLBuffer object for vertices
+//indexObject         WebGLBuffer object for indices
+//numIndices          The number of indices in the indexObject
+//
+function loadObj(ctx, url) {
+    var obj = {loaded: false };
+    obj.ctx = ctx;
+    var req = new XMLHttpRequest();
+    req.obj = obj;
+    g_loadingObjects.push(req);
+    req.onreadystatechange = function () { processLoadObj(req); };
+    req.open("GET", url, true);
+    req.send(null);
+    return obj;
+}
+
 // Array of images curently loading
 var g_loadingImages = [];
 
 // Clears all the images currently loading.
 // This is used to handle context lost events.
 function clearLoadingImages() {
-    for (var ii = 0; ii < g_loadingImages.length; ++ii) {
+    var ii;
+    for (ii = 0; ii < g_loadingImages.length; ++ii) {
         g_loadingImages[ii].onload = undefined;
     }
     g_loadingImages = [];
 }
 
-//
-// loadImageTexture
-//
-// Load the image at the passed url, place it in a new WebGLTexture object and return the WebGLTexture.
-//
-function loadImageTexture(ctx, url)
-{
-    var texture = ctx.createTexture();
-    var image = new Image();
-    g_loadingImages.push(image);
-    image.onload = function() { doLoadImageTexture(ctx, image, texture) }
-    image.src = url;
-    return texture;
-}
-
-function doLoadImageTexture(ctx, image, texture)
-{
+function doLoadImageTexture(ctx, image, texture) {
     g_loadingImages.splice(g_loadingImages.indexOf(image), 1);
     ctx.bindTexture(ctx.TEXTURE_2D, texture);
-    ctx.texImage2D(
-        ctx.TEXTURE_2D, 0, ctx.RGBA, ctx.RGBA, ctx.UNSIGNED_BYTE, image);
+    ctx.texImage2D(ctx.TEXTURE_2D, 0, ctx.RGBA, ctx.RGBA, ctx.UNSIGNED_BYTE, image);
     ctx.texParameteri(ctx.TEXTURE_2D, ctx.TEXTURE_MAG_FILTER, ctx.LINEAR);
     ctx.texParameteri(ctx.TEXTURE_2D, ctx.TEXTURE_MIN_FILTER, ctx.LINEAR);
     ctx.texParameteri(ctx.TEXTURE_2D, ctx.TEXTURE_WRAP_S, ctx.CLAMP_TO_EDGE);
@@ -557,49 +545,64 @@ function doLoadImageTexture(ctx, image, texture)
 }
 
 //
+// loadImageTexture
+//
+// Load the image at the passed url, place it in a new WebGLTexture object and return the WebGLTexture.
+//
+function loadImageTexture(ctx, url) {
+    var texture = ctx.createTexture();
+    var image = new Image();
+    g_loadingImages.push(image);
+    image.onload = function () { doLoadImageTexture(ctx, image, texture); };
+    image.src = url;
+    return texture;
+}
+
+//
 // Framerate object
 //
 // This object keeps track of framerate and displays it as the innerHTML text of the
 // HTML element with the passed id. Once created you call snapshot at the end
 // of every rendering cycle. Every 500ms the framerate is updated in the HTML element.
 //
-Framerate = function(id)
-{
+Framerate = function (id) {
     this.numFramerates = 10;
     this.framerateUpdateInterval = 500;
     this.id = id;
 
     this.renderTime = -1;
-    this.framerates = [ ];
+    this.framerates = [];
     self = this;
-    var fr = function() { self.updateFramerate() }
+    var fr = function () { self.updateFramerate(); };
     setInterval(fr, this.framerateUpdateInterval);
-}
+};
 
-Framerate.prototype.updateFramerate = function()
-{
-    var tot = 0;
-    for (var i = 0; i < this.framerates.length; ++i)
+Framerate.prototype.updateFramerate = function () {
+    var tot = 0, i;
+    for (i = 0; i < this.framerates.length; ++i) {
         tot += this.framerates[i];
+    }
 
     var framerate = tot / this.framerates.length;
     framerate = Math.round(framerate);
-    document.getElementById(this.id).innerHTML = "Framerate:"+framerate+"fps";
-}
+    document.getElementById(this.id).innerHTML = "Framerate:" + framerate + "fps";
+};
 
-Framerate.prototype.snapshot = function()
-{
-    if (this.renderTime < 0)
+Framerate.prototype.snapshot = function () {
+    if (this.renderTime < 0) {
         this.renderTime = new Date().getTime();
-    else {
+    } else {
         var newTime = new Date().getTime();
         var t = newTime - this.renderTime;
-        if (t == 0)
+        if (t === 0) {
             return;
-        var framerate = 1000/t;
+        }
+
+        var framerate = 1000 / t;
         this.framerates.push(framerate);
-        while (this.framerates.length > this.numFramerates)
+        while (this.framerates.length > this.numFramerates) {
             this.framerates.shift();
+        }
         this.renderTime = newTime;
     }
-}
+};

@@ -121,33 +121,36 @@ if ("WebKitCSSMatrix" in window && ("media" in window && window.media.matchMediu
 //
 // J3DIMatrix4
 //
-J3DIMatrix4 = function(m)
-{
-    if (J3DIHasCSSMatrix)
-        this.$matrix = new WebKitCSSMatrix;
-    else
-        this.$matrix = new Object;
+window.J3DIMatrix4 = function (m) {
 
-    if (typeof m == 'object') {
-        if ("length" in m && m.length >= 16) {
+    if (J3DIHasCSSMatrix) {
+        this.$matrix = new WebKitCSSMatrix();
+    } else {
+        this.$matrix = {};
+    }
+
+    if (typeof m === 'object') {
+        if (m.hasOwnProperty("length") && m.length >= 16) {
             this.load(m);
             return;
         }
-        else if (m instanceof J3DIMatrix4) {
+
+        if (m instanceof J3DIMatrix4) {
             this.load(m);
             return;
         }
     }
-    this.makeIdentity();
-}
 
-J3DIMatrix4.prototype.load = function()
-{
-    if (arguments.length == 1 && typeof arguments[0] == 'object') {
+    this.makeIdentity();
+};
+
+J3DIMatrix4.prototype.load = function (argument) {
+
+    if (arguments.length === 1 && typeof argument === 'object') {
         var matrix;
 
-        if (arguments[0] instanceof J3DIMatrix4) {
-            matrix = arguments[0].$matrix;
+        if (argument instanceof J3DIMatrix4) {
+            matrix = argument.$matrix;
 
             this.$matrix.m11 = matrix.m11;
             this.$matrix.m12 = matrix.m12;
@@ -170,10 +173,10 @@ J3DIMatrix4.prototype.load = function()
             this.$matrix.m44 = matrix.m44;
             return;
         }
-        else
-            matrix = arguments[0];
 
-        if ("length" in matrix && matrix.length >= 16) {
+        matrix = argument;
+
+        if (matrix.hasOwnProperty("length") && matrix.length >= 16) {
             this.$matrix.m11 = matrix[0];
             this.$matrix.m12 = matrix[1];
             this.$matrix.m13 = matrix[2];
@@ -198,38 +201,35 @@ J3DIMatrix4.prototype.load = function()
     }
 
     this.makeIdentity();
-}
+};
 
-J3DIMatrix4.prototype.getAsArray = function()
-{
+J3DIMatrix4.prototype.getAsArray = function () {
     return [
         this.$matrix.m11, this.$matrix.m12, this.$matrix.m13, this.$matrix.m14,
         this.$matrix.m21, this.$matrix.m22, this.$matrix.m23, this.$matrix.m24,
         this.$matrix.m31, this.$matrix.m32, this.$matrix.m33, this.$matrix.m34,
         this.$matrix.m41, this.$matrix.m42, this.$matrix.m43, this.$matrix.m44
     ];
-}
+};
 
-J3DIMatrix4.prototype.getAsFloat32Array = function()
-{
+J3DIMatrix4.prototype.getAsFloat32Array = function () {
     if (J3DIHasCSSMatrixCopy) {
         var array = new Float32Array(16);
         this.$matrix.copy(array);
         return array;
     }
     return new Float32Array(this.getAsArray());
-}
+};
 
-J3DIMatrix4.prototype.setUniform = function(ctx, loc, transpose)
-{
-    if (J3DIMatrix4.setUniformArray == undefined) {
+J3DIMatrix4.prototype.setUniform = function (ctx, loc, transpose) {
+    if (J3DIMatrix4.setUniformArray === undefined) {
         J3DIMatrix4.setUniformWebGLArray = new Float32Array(16);
         J3DIMatrix4.setUniformArray = new Array(16);
     }
 
-    if (J3DIHasCSSMatrixCopy)
+    if (J3DIHasCSSMatrixCopy) {
         this.$matrix.copy(J3DIMatrix4.setUniformWebGLArray);
-    else {
+    } else {
         J3DIMatrix4.setUniformArray[0] = this.$matrix.m11;
         J3DIMatrix4.setUniformArray[1] = this.$matrix.m12;
         J3DIMatrix4.setUniformArray[2] = this.$matrix.m13;
@@ -251,10 +251,10 @@ J3DIMatrix4.prototype.setUniform = function(ctx, loc, transpose)
     }
 
     ctx.uniformMatrix4fv(loc, transpose, J3DIMatrix4.setUniformWebGLArray);
-}
+};
 
-J3DIMatrix4.prototype.makeIdentity = function()
-{
+J3DIMatrix4.prototype.makeIdentity = function () {
+
     this.$matrix.m11 = 1;
     this.$matrix.m12 = 0;
     this.$matrix.m13 = 0;
@@ -274,10 +274,9 @@ J3DIMatrix4.prototype.makeIdentity = function()
     this.$matrix.m42 = 0;
     this.$matrix.m43 = 0;
     this.$matrix.m44 = 1;
-}
+};
 
-J3DIMatrix4.prototype.transpose = function()
-{
+J3DIMatrix4.prototype.transpose = function () {
     var tmp = this.$matrix.m12;
     this.$matrix.m12 = this.$matrix.m21;
     this.$matrix.m21 = tmp;
@@ -301,10 +300,9 @@ J3DIMatrix4.prototype.transpose = function()
     tmp = this.$matrix.m34;
     this.$matrix.m34 = this.$matrix.m43;
     this.$matrix.m43 = tmp;
-}
+};
 
-J3DIMatrix4.prototype.invert = function()
-{
+J3DIMatrix4.prototype.invert = function () {
     if (J3DIHasCSSMatrix) {
         this.$matrix = this.$matrix.inverse();
         return;
@@ -315,8 +313,9 @@ J3DIMatrix4.prototype.invert = function()
     // then the inverse matrix is not unique.
     var det = this._determinant4x4();
 
-    if (Math.abs(det) < 1e-8)
+    if (Math.abs(det) < 1e-8) {
         return null;
+    }
 
     this._makeAdjoint();
 
@@ -340,23 +339,18 @@ J3DIMatrix4.prototype.invert = function()
     this.$matrix.m42 /= det;
     this.$matrix.m43 /= det;
     this.$matrix.m44 /= det;
-}
+};
 
-J3DIMatrix4.prototype.translate = function(x,y,z)
-{
-    if (typeof x == 'object' && "length" in x) {
+J3DIMatrix4.prototype.translate = function (x, y, z) {
+    if (typeof x === 'object' &&  x.hasOwnProperty("length")) {
         var t = x;
         x = t[0];
         y = t[1];
         z = t[2];
-    }
-    else {
-        if (x == undefined)
-            x = 0;
-        if (y == undefined)
-            y = 0;
-        if (z == undefined)
-            z = 0;
+    } else {
+        if (x === undefined) {x = 0; }
+        if (y === undefined) {y = 0; }
+        if (z === undefined) {z = 0; }
     }
 
     if (J3DIHasCSSMatrix) {
@@ -370,29 +364,28 @@ J3DIMatrix4.prototype.translate = function(x,y,z)
     matrix.$matrix.m43 = z;
 
     this.multiply(matrix);
-}
+};
 
-J3DIMatrix4.prototype.scale = function(x,y,z)
-{
-    if (typeof x == 'object' && "length" in x) {
+J3DIMatrix4.prototype.scale = function (x, y, z) {
+
+    if (typeof x === 'object' && x.hasOwnProperty("length")) {
         var t = x;
         x = t[0];
         y = t[1];
         z = t[2];
-    }
-    else {
-        if (x == undefined)
-            x = 1;
-        if (z == undefined) {
-            if (y == undefined) {
+    } else {
+        if (x === undefined) {x = 1; }
+
+        if (z === undefined) {
+            if (y === undefined) {
                 y = x;
                 z = x;
-            }
-            else
+            } else {
                 z = 1;
-        }
-        else if (y == undefined)
+            }
+        } else if (y === undefined) {
             y = x;
+        }
     }
 
     if (J3DIHasCSSMatrix) {
@@ -406,27 +399,30 @@ J3DIMatrix4.prototype.scale = function(x,y,z)
     matrix.$matrix.m33 = z;
 
     this.multiply(matrix);
-}
+};
 
-J3DIMatrix4.prototype.rotate = function(angle,x,y,z)
-{
+J3DIMatrix4.prototype.rotate = function (iangle, ix, iy, iz) {
     // Forms are (angle, x,y,z), (angle,vector), (angleX, angleY, angleZ), (angle)
-    if (typeof x == 'object' && "length" in x) {
+
+    var angle = iangle;
+    var x = ix;
+    var y = iy;
+    var z = iz;
+
+    if (typeof x === 'object' && x.hasOwnProperty("length")) {
         var t = x;
         x = t[0];
         y = t[1];
         z = t[2];
-    }
-    else {
-        if (arguments.length == 1) {
+    } else {
+        if (arguments.length === 1) {
             x = 0;
             y = 0;
             z = 1;
-        }
-        else if (arguments.length == 3) {
-            this.rotate(angle, 1,0,0); // about X axis
-            this.rotate(x, 0,1,0); // about Y axis
-            this.rotate(y, 0,0,1); // about Z axis
+        } else if (arguments.length === 3) {
+            this.rotate(angle, 1, 0, 0); // about X axis
+            this.rotate(x, 0, 1, 0); // about Y axis
+            this.rotate(y, 0, 0, 1); // about Z axis
             return;
         }
     }
@@ -446,12 +442,12 @@ J3DIMatrix4.prototype.rotate = function(angle,x,y,z)
 
     // normalize
     var len = Math.sqrt(x * x + y * y + z * z);
-    if (len == 0) {
+    if (len === 0) {
         // bad vector, just use something reasonable
         x = 0;
         y = 0;
         z = 1;
-    } else if (len != 1) {
+    } else if (len !== 1) {
         x /= len;
         y /= len;
         z /= len;
@@ -460,7 +456,7 @@ J3DIMatrix4.prototype.rotate = function(angle,x,y,z)
     var mat = new J3DIMatrix4();
 
     // optimize case where axis is along major axis
-    if (x == 1 && y == 0 && z == 0) {
+    if (x === 1 && y === 0 && z === 0) {
         mat.$matrix.m11 = 1;
         mat.$matrix.m12 = 0;
         mat.$matrix.m13 = 0;
@@ -473,7 +469,7 @@ J3DIMatrix4.prototype.rotate = function(angle,x,y,z)
         mat.$matrix.m14 = mat.$matrix.m24 = mat.$matrix.m34 = 0;
         mat.$matrix.m41 = mat.$matrix.m42 = mat.$matrix.m43 = 0;
         mat.$matrix.m44 = 1;
-    } else if (x == 0 && y == 1 && z == 0) {
+    } else if (x === 0 && y === 1 && z === 0) {
         mat.$matrix.m11 = 1 - 2 * sinA2;
         mat.$matrix.m12 = 0;
         mat.$matrix.m13 = -2 * sinA * cosA;
@@ -486,7 +482,7 @@ J3DIMatrix4.prototype.rotate = function(angle,x,y,z)
         mat.$matrix.m14 = mat.$matrix.m24 = mat.$matrix.m34 = 0;
         mat.$matrix.m41 = mat.$matrix.m42 = mat.$matrix.m43 = 0;
         mat.$matrix.m44 = 1;
-    } else if (x == 0 && y == 0 && z == 1) {
+    } else if (x === 0 && y === 0 && z === 1) {
         mat.$matrix.m11 = 1 - 2 * sinA2;
         mat.$matrix.m12 = 2 * sinA * cosA;
         mat.$matrix.m13 = 0;
@@ -500,9 +496,9 @@ J3DIMatrix4.prototype.rotate = function(angle,x,y,z)
         mat.$matrix.m41 = mat.$matrix.m42 = mat.$matrix.m43 = 0;
         mat.$matrix.m44 = 1;
     } else {
-        var x2 = x*x;
-        var y2 = y*y;
-        var z2 = z*z;
+        var x2 = x * x;
+        var y2 = y * y;
+        var z2 = z * z;
 
         mat.$matrix.m11 = 1 - 2 * (y2 + z2) * sinA2;
         mat.$matrix.m12 = 2 * (x * y * sinA2 + z * sinA * cosA);
@@ -518,10 +514,10 @@ J3DIMatrix4.prototype.rotate = function(angle,x,y,z)
         mat.$matrix.m44 = 1;
     }
     this.multiply(mat);
-}
+};
 
-J3DIMatrix4.prototype.multiply = function(mat)
-{
+J3DIMatrix4.prototype.multiply = function (mat) {
+
     if (J3DIHasCSSMatrix) {
         this.$matrix = this.$matrix.multiply(mat.$matrix);
         return;
@@ -582,10 +578,9 @@ J3DIMatrix4.prototype.multiply = function(mat)
     this.$matrix.m42 = m42;
     this.$matrix.m43 = m43;
     this.$matrix.m44 = m44;
-}
+};
 
-J3DIMatrix4.prototype.divide = function(divisor)
-{
+J3DIMatrix4.prototype.divide = function (divisor) {
     this.$matrix.m11 /= divisor;
     this.$matrix.m12 /= divisor;
     this.$matrix.m13 /= divisor;
@@ -606,10 +601,9 @@ J3DIMatrix4.prototype.divide = function(divisor)
     this.$matrix.m43 /= divisor;
     this.$matrix.m44 /= divisor;
 
-}
+};
 
-J3DIMatrix4.prototype.ortho = function(left, right, bottom, top, near, far)
-{
+J3DIMatrix4.prototype.ortho = function (left, right, bottom, top, near, far) {
     var tx = (left + right) / (left - right);
     var ty = (top + bottom) / (top - bottom);
     var tz = (far + near) / (far - near);
@@ -633,10 +627,10 @@ J3DIMatrix4.prototype.ortho = function(left, right, bottom, top, near, far)
     matrix.$matrix.m44 = 1;
 
     this.multiply(matrix);
-}
+};
 
-J3DIMatrix4.prototype.frustum = function(left, right, bottom, top, near, far)
-{
+J3DIMatrix4.prototype.frustum = function (left, right, bottom, top, near, far) {
+
     var matrix = new J3DIMatrix4();
     var A = (right + left) / (right - left);
     var B = (top + bottom) / (top - bottom);
@@ -664,20 +658,19 @@ J3DIMatrix4.prototype.frustum = function(left, right, bottom, top, near, far)
     matrix.$matrix.m44 = 0;
 
     this.multiply(matrix);
-}
+};
 
-J3DIMatrix4.prototype.perspective = function(fovy, aspect, zNear, zFar)
-{
+J3DIMatrix4.prototype.perspective = function (fovy, aspect, zNear, zFar) {
+
     var top = Math.tan(fovy * Math.PI / 360) * zNear;
     var bottom = -top;
     var left = aspect * bottom;
     var right = aspect * top;
     this.frustum(left, right, bottom, top, zNear, zFar);
-}
+};
 
-J3DIMatrix4.prototype.lookat = function(eyex, eyey, eyez, centerx, centery, centerz, upx, upy, upz)
-{
-    if (typeof eyez == 'object' && "length" in eyez) {
+J3DIMatrix4.prototype.lookat = function (eyex, eyey, eyez, centerx, centery, centerz, upx, upy, upz) {
+    if (typeof eyez === 'object' && eyez.hasOwnProperty("length")) {
         var t = eyez;
         upx = t[0];
         upy = t[1];
@@ -715,9 +708,9 @@ J3DIMatrix4.prototype.lookat = function(eyex, eyey, eyez, centerx, centery, cent
     var yz = upz;
 
     // X vector = Y cross Z
-    xx =  yy * zz - yz * zy;
-    xy = -yx * zz + yz * zx;
-    xz =  yx * zy - yy * zx;
+    var xx =  yy * zz - yz * zy;
+    var xy = -yx * zz + yz * zx;
+    var xz =  yx * zy - yy * zx;
 
     // Recompute Y = Z cross X
     yx = zy * xz - zz * xy;
@@ -763,23 +756,20 @@ J3DIMatrix4.prototype.lookat = function(eyex, eyey, eyez, centerx, centery, cent
     matrix.translate(-eyex, -eyey, -eyez);
 
     this.multiply(matrix);
-}
+};
 
 // Returns true on success, false otherwise. All params are Array objects
-J3DIMatrix4.prototype.decompose = function(_translate, _rotate, _scale, _skew, _perspective)
-{
+J3DIMatrix4.prototype.decompose = function (_translate, _rotate, _scale, _skew, _perspective) {
+
     // Normalize the matrix.
-    if (this.$matrix.m44 == 0)
-        return false;
+    if (this.$matrix.m44 === 0) {return false; }
 
     // Gather the params
-    var translate, rotate, scale, skew, perspective;
-
-    var translate = (_translate == undefined || !("length" in _translate)) ? new J3DIVector3 : _translate;
-    var rotate = (_rotate == undefined || !("length" in _rotate)) ? new J3DIVector3 : _rotate;
-    var scale = (_scale == undefined || !("length" in _scale)) ? new J3DIVector3 : _scale;
-    var skew = (_skew == undefined || !("length" in _skew)) ? new J3DIVector3 : _skew;
-    var perspective = (_perspective == undefined || !("length" in _perspective)) ? new Array(4) : _perspective;
+    var translate = (_translate === undefined || !(_translate.hasOwnProperty("length"))) ? new J3DIVector3() : _translate;
+    var rotate = (_rotate === undefined || !(_rotate.hasOwnProperty("length"))) ? new J3DIVector3() : _rotate;
+    var scale = (_scale === undefined || !(_scale.hasOwnProperty("length"))) ? new J3DIVector3() : _scale;
+    var skew = (_skew === undefined || !(_skew.hasOwnProperty("length"))) ? new J3DIVector3() : _skew;
+    var perspective = (_perspective === undefined || !(_perspective.hasOwnProperty("length"))) ? new Array(4) : _perspective;
 
     var matrix = new J3DIMatrix4(this);
 
@@ -794,11 +784,10 @@ J3DIMatrix4.prototype.decompose = function(_translate, _rotate, _scale, _skew, _
     perspectiveMatrix.$matrix.m34 = 0;
     perspectiveMatrix.$matrix.m44 = 1;
 
-    if (perspectiveMatrix._determinant4x4() == 0)
-        return false;
+    if (perspectiveMatrix._determinant4x4() === 0) {return false; }
 
     // First, isolate perspective.
-    if (matrix.$matrix.m14 != 0 || matrix.$matrix.m24 != 0 || matrix.$matrix.m34 != 0) {
+    if (matrix.$matrix.m14 !== 0 || matrix.$matrix.m24 !== 0 || matrix.$matrix.m34 !== 0) {
         // rightHandSide is the right hand side of the equation.
         var rightHandSide = [ matrix.$matrix.m14, matrix.$matrix.m24, matrix.$matrix.m34, matrix.$matrix.m44 ];
 
@@ -811,22 +800,21 @@ J3DIMatrix4.prototype.decompose = function(_translate, _rotate, _scale, _skew, _
         transposedInversePerspectiveMatrix.multVecMatrix(perspective, rightHandSide);
 
         // Clear the perspective partition
-        matrix.$matrix.m14 = matrix.$matrix.m24 = matrix.$matrix.m34 = 0
+        matrix.$matrix.m14 = matrix.$matrix.m24 = matrix.$matrix.m34 = 0;
         matrix.$matrix.m44 = 1;
-    }
-    else {
+    } else {
         // No perspective.
         perspective[0] = perspective[1] = perspective[2] = 0;
         perspective[3] = 1;
     }
 
     // Next take care of translation
-    translate[0] = matrix.$matrix.m41
-    matrix.$matrix.m41 = 0
-    translate[1] = matrix.$matrix.m42
-    matrix.$matrix.m42 = 0
-    translate[2] = matrix.$matrix.m43
-    matrix.$matrix.m43 = 0
+    translate[0] = matrix.$matrix.m41;
+    matrix.$matrix.m41 = 0;
+    translate[1] = matrix.$matrix.m42;
+    matrix.$matrix.m42 = 0;
+    translate[2] = matrix.$matrix.m43;
+    matrix.$matrix.m43 = 0;
 
     // Now get scale and shear. 'row' is a 3 element array of 3 component vectors
     var row0 = new J3DIVector3(matrix.$matrix.m11, matrix.$matrix.m12, matrix.$matrix.m13);
@@ -863,6 +851,9 @@ J3DIMatrix4.prototype.decompose = function(_translate, _rotate, _scale, _skew, _
     // is -1, then negate the matrix and the scaling factors.
     var pdum3 = new J3DIVector3(row1);
     pdum3.cross(row2);
+
+    var i;
+
     if (row0.dot(pdum3) < 0) {
         for (i = 0; i < 3; i++) {
             scale[i] *= -1;
@@ -874,11 +865,10 @@ J3DIMatrix4.prototype.decompose = function(_translate, _rotate, _scale, _skew, _
 
     // Now, get the rotations out
     rotate[1] = Math.asin(-row0[2]);
-    if (Math.cos(rotate[1]) != 0) {
+    if (Math.cos(rotate[1]) !== 0) {
         rotate[0] = Math.atan2(row1[2], row2[2]);
         rotate[2] = Math.atan2(row0[1], row0[0]);
-    }
-    else {
+    } else {
         rotate[0] = Math.atan2(-row2[0], row1[1]);
         rotate[2] = 0;
     }
@@ -890,22 +880,19 @@ J3DIMatrix4.prototype.decompose = function(_translate, _rotate, _scale, _skew, _
     rotate[2] *= rad2deg;
 
     return true;
-}
+};
 
-J3DIMatrix4.prototype._determinant2x2 = function(a, b, c, d)
-{
+J3DIMatrix4.prototype._determinant2x2 = function (a, b, c, d) {
     return a * d - b * c;
-}
+};
 
-J3DIMatrix4.prototype._determinant3x3 = function(a1, a2, a3, b1, b2, b3, c1, c2, c3)
-{
+J3DIMatrix4.prototype._determinant3x3 = function (a1, a2, a3, b1, b2, b3, c1, c2, c3) {
     return a1 * this._determinant2x2(b2, b3, c2, c3)
          - b1 * this._determinant2x2(a2, a3, c2, c3)
          + c1 * this._determinant2x2(a2, a3, b2, b3);
-}
+};
 
-J3DIMatrix4.prototype._determinant4x4 = function()
-{
+J3DIMatrix4.prototype._determinant4x4 = function () {
     var a1 = this.$matrix.m11;
     var b1 = this.$matrix.m12;
     var c1 = this.$matrix.m13;
@@ -930,10 +917,9 @@ J3DIMatrix4.prototype._determinant4x4 = function()
          - b1 * this._determinant3x3(a2, a3, a4, c2, c3, c4, d2, d3, d4)
          + c1 * this._determinant3x3(a2, a3, a4, b2, b3, b4, d2, d3, d4)
          - d1 * this._determinant3x3(a2, a3, a4, b2, b3, b4, c2, c3, c4);
-}
+};
 
-J3DIMatrix4.prototype._makeAdjoint = function()
-{
+J3DIMatrix4.prototype._makeAdjoint = function () {
     var a1 = this.$matrix.m11;
     var b1 = this.$matrix.m12;
     var c1 = this.$matrix.m13;
@@ -955,6 +941,7 @@ J3DIMatrix4.prototype._makeAdjoint = function()
     var d4 = this.$matrix.m44;
 
     // Row column labeling reversed since we transpose rows & columns
+    /*jslint white:true */
     this.$matrix.m11  =   this._determinant3x3(b2, b3, b4, c2, c3, c4, d2, d3, d4);
     this.$matrix.m21  = - this._determinant3x3(a2, a3, a4, c2, c3, c4, d2, d3, d4);
     this.$matrix.m31  =   this._determinant3x3(a2, a3, a4, b2, b3, b4, d2, d3, d4);
@@ -974,76 +961,67 @@ J3DIMatrix4.prototype._makeAdjoint = function()
     this.$matrix.m24  =   this._determinant3x3(a1, a2, a3, c1, c2, c3, d1, d2, d3);
     this.$matrix.m34  = - this._determinant3x3(a1, a2, a3, b1, b2, b3, d1, d2, d3);
     this.$matrix.m44  =   this._determinant3x3(a1, a2, a3, b1, b2, b3, c1, c2, c3);
-}
+    /*jslint white:false */
+};
 
 //
 // J3DIVector3
 //
-J3DIVector3 = function(x,y,z)
-{
-    this.load(x,y,z);
-}
+J3DIVector3 = function (x, y, z) {
+    this.load(x, y, z);
+};
 
-J3DIVector3.prototype.load = function(x,y,z)
-{
-    if (typeof x == 'object' && "length" in x) {
+J3DIVector3.prototype.load = function (x, y, z) {
+    if (typeof x === 'object' && x.hasOwnProperty("length")) {
         this[0] = x[0];
         this[1] = x[1];
         this[2] = x[2];
-    }
-    else if (typeof x == 'number') {
+    } else if (typeof x === 'number') {
         this[0] = x;
         this[1] = y;
         this[2] = z;
-    }
-    else {
+    } else {
         this[0] = 0;
         this[1] = 0;
         this[2] = 0;
     }
-}
+};
 
-J3DIVector3.prototype.getAsArray = function()
-{
+J3DIVector3.prototype.getAsArray = function () {
     return [ this[0], this[1], this[2] ];
-}
+};
 
-J3DIVector3.prototype.getAsFloat32Array = function()
-{
+J3DIVector3.prototype.getAsFloat32Array = function () {
     return new Float32Array(this.getAsArray());
-}
+};
 
-J3DIVector3.prototype.vectorLength = function()
-{
+J3DIVector3.prototype.vectorLength = function () {
     return Math.sqrt(this[0] * this[0] + this[1] * this[1] + this[2] * this[2]);
-}
+};
 
-J3DIVector3.prototype.divide = function(divisor)
-{
-    this[0] /= divisor; this[1] /= divisor; this[2] /= divisor;
-}
+J3DIVector3.prototype.divide = function (divisor) {
+    this[0] /= divisor;
+    this[1] /= divisor;
+    this[2] /= divisor;
+};
 
-J3DIVector3.prototype.cross = function(v)
-{
-    this[0] =  this[1] * v[2] - this[2] * v[1];
+J3DIVector3.prototype.cross = function (v) {
+    this[0] = this[1] * v[2] - this[2] * v[1];
     this[1] = -this[0] * v[2] + this[2] * v[0];
-    this[2] =  this[0] * v[1] - this[1] * v[0];
-}
+    this[2] = this[0] * v[1] - this[1] * v[0];
+};
 
-J3DIVector3.prototype.dot = function(v)
-{
+J3DIVector3.prototype.dot = function (v) {
     return this[0] * v[0] + this[1] * v[1] + this[2] * v[2];
-}
+};
 
-J3DIVector3.prototype.combine = function(v, ascl, bscl)
-{
+J3DIVector3.prototype.combine = function (v, ascl, bscl) {
     this[0] = (ascl * this[0]) + (bscl * v[0]);
     this[1] = (ascl * this[1]) + (bscl * v[1]);
     this[2] = (ascl * this[2]) + (bscl * v[2]);
-}
+};
 
-J3DIVector3.prototype.multVecMatrix = function(matrix)
-{
+J3DIVector3.prototype.multVecMatrix = function (matrix) {
     var x = this[0];
     var y = this[1];
     var z = this[2];
@@ -1052,14 +1030,13 @@ J3DIVector3.prototype.multVecMatrix = function(matrix)
     this[1] = matrix.$matrix.m42 + x * matrix.$matrix.m12 + y * matrix.$matrix.m22 + z * matrix.$matrix.m32;
     this[2] = matrix.$matrix.m43 + x * matrix.$matrix.m13 + y * matrix.$matrix.m23 + z * matrix.$matrix.m33;
     var w = matrix.$matrix.m44 + x * matrix.$matrix.m14 + y * matrix.$matrix.m24 + z * matrix.$matrix.m34;
-    if (w != 1 && w != 0) {
+    if (w !== 1 && w !== 0) {
         this[0] /= w;
         this[1] /= w;
         this[2] /= w;
     }
-}
+};
 
-J3DIVector3.prototype.toString = function()
-{
-    return "["+this[0]+","+this[1]+","+this[2]+"]";
-}
+J3DIVector3.prototype.toString = function () {
+    return "[" + this[0] + "," + this[1] + "," + this[2] + "]";
+};

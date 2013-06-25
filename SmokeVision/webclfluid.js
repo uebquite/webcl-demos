@@ -87,16 +87,16 @@ var ds = 1.0;
 var running = false;
 
 requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame ||
-  window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
+    window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
 
 //var start = window.mozAnimationStartTime;  // Only supported in FF. Other browsers can use something like Date.now().
 var start = Date.now();
 
 function webclfluid() {
-    var box;
+    var box = null, i, j, k;
     var boundaries = [];
 
-    numCells = (dim+2)*(dim+2)*(dim+2);
+    numCells = (dim + 2) * (dim + 2) * (dim + 2);
 
     timerConsole = document.getElementById("test");
     canvas = document.getElementById("sim_canvas");
@@ -107,13 +107,13 @@ function webclfluid() {
 
     // Get WebGL context
     gl = initWebGL("sim_canvas", "2d");
-    if(!gl) {
+    if (!gl) {
         return false;
     }
 
     gl.viewport(0, 0, canvas.width, canvas.height);
 
-    pixelCount = canvas.width*canvas.height;
+    pixelCount = canvas.width * canvas.height;
 
     // create scalar and vector fields
     scalarField = new ScalarField(dim, viscosity, dt, boundaries, box);
@@ -126,22 +126,22 @@ function webclfluid() {
 
     // Init empty scalar and vector fields used as source fields
     scalarAddField = new Float32Array(numCells);
-    vectorAddField = new Float32Array(numCells*3);
+    vectorAddField = new Float32Array(numCells * 3);
 
-    for(var i = 0; i < dim+2; i++) {
-        for(var j = 0; j < dim+2; j++) {
-            for(var k = 0; k < dim+2; k++) {
-                scalarAddField[index(i,j,k,dim)] = 0.0;
-                vectorAddField[vindex(i,j,k,0,dim)] = 0.0;
-                vectorAddField[vindex(i,j,k,1,dim)] = 0.0;
-                vectorAddField[vindex(i,j,k,2,dim)] = 0.0;
+    for (i = 0; i < dim + 2; i++) {
+        for (j = 0; j < dim + 2; j++) {
+            for (k = 0; k < dim + 2; k++) {
+                scalarAddField[index(i, j, k, dim)] = 0.0;
+                vectorAddField[vindex(i, j, k, 0, dim)] = 0.0;
+                vectorAddField[vindex(i, j, k, 1, dim)] = 0.0;
+                vectorAddField[vindex(i, j, k, 2, dim)] = 0.0;
             }
         }
     }
 
     // Density and Velocity added to the simulation on each cycle
-    scalarAddField[index(dim/2,dim-1,dim/2,dim)] = 1000.0;
-    vectorAddField[vindex(dim/2,dim-2,dim/2,1,dim)] = -200.0;
+    scalarAddField[index(dim / 2, dim - 1, dim / 2, dim)] = 1000.0;
+    vectorAddField[vindex(dim / 2, dim - 2, dim / 2, 1, dim)] = -200.0;
 
     if (setupWebCL() === false) {
         return false;
@@ -160,48 +160,48 @@ function webclfluid() {
 }
 
 function mouse_move(e) {
+    var i, start;
+    var bufSize = 4 * numCells;
+
     dirX = (e.layerX - mouseX) * 100;
     mouseX = e.layerX;
 
     dirY = (e.layerY - mouseY) * 100;
     mouseY = e.layerY;
 
-    if(mousePressed === 1) {
+    if (mousePressed === 1) {
         var simX = Math.floor(e.layerX * (dim / canvas.clientWidth));
         var simY = Math.floor(e.layerY * (dim / canvas.clientHeight));
 
-        if(dirX > 1000.0) {
+        if (dirX > 1000.0) {
             dirX = 1000.0;
-        }
-        else if(dirX < -1000.0) {
+        } else if (dirX < -1000.0) {
             dirX = -1000.0;
         }
 
-        if(dirY > 1000.0) {
+        if (dirY > 1000.0) {
             dirY = 1000.0;
-        }
-        else if(dirY < -1000.0) {
+        } else if (dirY < -1000.0) {
             dirY = -1000.0;
         }
-        for(var i = 1; i < dim+1; i++) {
-            vectorAddField[vindex(simX,simY,i,0,dim)] = dirX;
-            vectorAddField[vindex(simX,simY,i,1,dim)] = dirY;
+
+        for (i = 1; i < dim + 1; i++) {
+            vectorAddField[vindex(simX, simY, i, 0, dim)] = dirX;
+            vectorAddField[vindex(simX, simY, i, 1, dim)] = dirY;
         }
 
-        var start = Date.now();
-        var bufSize = 4 * numCells;
-        clQueue.enqueueWriteBuffer(vectorSourceBuffer, true, 0, bufSize*3, vectorAddField, []);
+        start = Date.now();
+
+        clQueue.enqueueWriteBuffer(vectorSourceBuffer, true, 0, bufSize * 3, vectorAddField, []);
         clMemTime = Date.now() - start;
 
-        for(var i = 1; i < dim+1; i++) {
-            vectorAddField[vindex(simX,simY,i,0,dim)] = 0.0;
-            vectorAddField[vindex(simX,simY,i,1,dim)] = 0.0;
+        for (i = 1; i < dim + 1; i++) {
+            vectorAddField[vindex(simX, simY, i, 0, dim)] = 0.0;
+            vectorAddField[vindex(simX, simY, i, 1, dim)] = 0.0;
         }
-    }
-    else {
-        var start = Date.now();
-        var bufSize = 4 * numCells;
-        clQueue.enqueueWriteBuffer(vectorSourceBuffer, true, 0, bufSize*3, vectorAddField, []);
+    } else {
+        start = Date.now();
+        clQueue.enqueueWriteBuffer(vectorSourceBuffer, true, 0, bufSize * 3, vectorAddField, []);
         clMemTime = Date.now() - start;
     }
 }
@@ -219,20 +219,21 @@ function mouse_leave(e) {
 function mouse_down(e) {
     mouseX = e.layerX;
     mouseY = e.layerY;
-  mousePressed = 1;
+    mousePressed = 1;
 }
 
 function mouse_up(e) {
     mouseX = e.layerX;
     mouseY = e.layerY;
-  mousePressed = 0;
+    mousePressed = 0;
 }
 
 function step() {
-    if(running == true) {
+    var timeElapsed;
+    if (running === true) {
         timeElapsed = Date.now() - prevTime;
         prevTime = Date.now();
-        timerConsole.innerHTML = "<br>FPS: " + ((1/timeElapsed) * 1000).toFixed();
+        timerConsole.innerHTML = "<br>FPS: " + ((1 / timeElapsed) * 1000).toFixed();
 
         jsTime = 0;
         clTime = 0;
@@ -247,67 +248,69 @@ function step() {
 }
 
 function clDeviceQuery() {
-  var deviceList = [];
+    var deviceList = [], devices = [], p, plat, d, x, availableDevice;
+    var platforms = (WebCLCommon.getPlatforms());
 
-  var platforms = (WebCLCommon.getPlatforms());
+    for (p = 0; p < platforms.length; p++) {
+        plat = platforms[p];
+        devices = [];
+        devices.push(plat.getDevices(webcl.DEVICE_TYPE_CPU));
+        devices.push(plat.getDevices(webcl.DEVICE_TYPE_GPU));
 
-  for (var p=0; p < platforms.length; p++) {
-    var plat = platforms[p];
-    var devices = [];
-    devices.push(plat.getDevices(webcl.DEVICE_TYPE_CPU));
-    devices.push(plat.getDevices(webcl.DEVICE_TYPE_GPU));
-
-    for (var d=0; d < devices.length; d++) {
-        for (var x = 0; x < devices[d].length; x++) {
-            if (devices[d][x].getInfo(webcl.DEVICE_AVAILABLE) === true) {
-                var availableDevice = { 'device' : devices[d][x],
-                                        'type' : devices[d][x].getInfo(webcl.DEVICE_TYPE) ==  webcl.DEVICE_TYPE_CPU ? 'CPU' : 'GPU' ,
-                                        'name' : devices[d][x].getInfo(webcl.DEVICE_TYPE) ==  webcl.DEVICE_TYPE_CPU ? 'CPU' : 'GPU' ,
+        for (d = 0; d < devices.length; d++) {
+            for (x = 0; x < devices[d].length; x++) {
+                if (devices[d][x].getInfo(webcl.DEVICE_AVAILABLE) === true) {
+                    availableDevice = { 'device' : devices[d][x],
+                                        'type' : devices[d][x].getInfo(webcl.DEVICE_TYPE) ===  webcl.DEVICE_TYPE_CPU ? 'CPU' : 'GPU',
+                                        'name' : devices[d][x].getInfo(webcl.DEVICE_TYPE) ===  webcl.DEVICE_TYPE_CPU ? 'CPU' : 'GPU',
                                         'version' : devices[d][x].getInfo(webcl.DEVICE_VERSION),
                                         'vendor' : 'Apple',
                                         'platform' : 'MAC' };
-                deviceList.push(availableDevice);
+                    deviceList.push(availableDevice);
+                }
             }
         }
     }
-  }
-  return deviceList;
+
+    return deviceList;
 }
 
 function setupWebCL() {
 
-  WebCLCommon.init("ALL");
-  var deviceList = clDeviceQuery();
+    WebCLCommon.init("ALL");
+    var deviceList = clDeviceQuery();
+    var i, htmlDeviceList, deviceselect, selectedDevice, selectedPlatform, ctxProps;
 
-  if (deviceList.length === 0) {
+    if (deviceList.length === 0) {
         alert("Unfortunately your browser/system doesn't support WebCL.");
         return false;
     }
 
-  try {
-    var htmlDeviceList = "";
-        for(var i in deviceList) {
+    try {
+        htmlDeviceList = "";
+
+        for (i = 0; i < deviceList.length; i++) {
             htmlDeviceList += "<option value=" + i + ">" + deviceList[i].vendor + ": " + deviceList[i].name + "</option>\n";
         }
 
-        var deviceselect = document.getElementById("devices");
+        deviceselect = document.getElementById("devices");
         deviceselect.innerHTML = htmlDeviceList;
         deviceselect.selectedIndex = selected;
 
-        var selectedDevice = deviceList[selected].device;
-        var selectedPlatform = deviceList[selected].platform;
+        selectedDevice = deviceList[selected].device;
+        selectedPlatform = deviceList[selected].platform;
 
-        var ctxProps = {platform: selectedPlatform,
+        ctxProps = {platform: selectedPlatform,
                         devices: [selectedDevice]};
 
         cl = WebCLCommon.createContext(ctxProps);
         clQueue = WebCLCommon.createCommandQueue(selectedDevice);
 
         allocateBuffers();
-    } catch(err) {
-    console.log(err);
+    } catch (err) {
+        console.log(err);
         alert("Error initializing WebCL");
-    return false;
+        return false;
     }
 
     try {
@@ -332,7 +335,7 @@ function setupWebCL() {
         vectorProjectionThird = vectorProgram.createKernel("vectorProjectionThird");
         vectorVorticityFirstKernel = vectorProgram.createKernel("vectorVorticityConfinementFirst");
         vectorVorticitySecondKernel = vectorProgram.createKernel("vectorVorticityConfinementSecond");
-    } catch(e) {
+    } catch (e) {
         console.error(e);
         return false;
     }
@@ -346,11 +349,10 @@ function reset() {
 }
 
 function stop() {
-    if(running) {
+    if (running) {
         running = false;
         document.getElementById("stop").innerHTML = "Start";
-    }
-    else {
+    } else {
         running = true;
         requestAnimationFrame(step, canvas);
         document.getElementById("stop").innerHTML = "Stop";
@@ -359,32 +361,29 @@ function stop() {
 
 
 function dtChanged(value) {
-    if(!isNaN(value) && value > 0) {
+    if (!isNaN(value) && value > 0) {
         dt = value;
         scalarField.setTimestep(dt);
         vectorField.setTimestep(dt);
-    }
-    else {
+    } else {
         document.getElementById("dt").value = dt;
     }
 }
 
 function dsChanged(value) {
-    if(!isNaN(value) && value > 0) {
+    if (!isNaN(value) && value > 0) {
         ds = value;
-    }
-    else {
+    } else {
         document.getElementById("ds").value = ds;
     }
 }
 
 function viscosityChanged(value) {
-    if(!isNaN(value) && value > 0) {
+    if (!isNaN(value) && value > 0) {
         viscosity = value;
         scalarField.setViscosity(viscosity);
         vectorField.setViscosity(viscosity);
-    }
-    else {
+    } else {
         document.getElementById("viscosity").value = viscosity;
     }
 }
@@ -409,17 +408,17 @@ function allocateBuffers() {
     scalarSourceBuffer = cl.createBuffer(webcl.MEM_READ_ONLY, bufSize);
     clQueue.enqueueWriteBuffer(scalarSourceBuffer, false, 0, bufSize, scalarAddField);
 
-    scalarTempBuffer= cl.createBuffer(webcl.MEM_READ_WRITE, bufSize);
-    scalarSecondTempBuffer= cl.createBuffer(webcl.MEM_READ_WRITE, bufSize);
+    scalarTempBuffer = cl.createBuffer(webcl.MEM_READ_WRITE, bufSize);
+    scalarSecondTempBuffer = cl.createBuffer(webcl.MEM_READ_WRITE, bufSize);
 
     /* Vector Buffers */
-    vectorBuffer = cl.createBuffer(webcl.MEM_READ_WRITE, bufSize*3);
-    clQueue.enqueueWriteBuffer(vectorBuffer, true, 0, bufSize*3, vectorField.getField());
+    vectorBuffer = cl.createBuffer(webcl.MEM_READ_WRITE, bufSize * 3);
+    clQueue.enqueueWriteBuffer(vectorBuffer, true, 0, bufSize * 3, vectorField.getField());
 
-    vectorSourceBuffer = cl.createBuffer(webcl.MEM_READ_ONLY, bufSize*3);
-    clQueue.enqueueWriteBuffer(vectorSourceBuffer, true, 0, bufSize*3, vectorAddField);
+    vectorSourceBuffer = cl.createBuffer(webcl.MEM_READ_ONLY, bufSize * 3);
+    clQueue.enqueueWriteBuffer(vectorSourceBuffer, true, 0, bufSize * 3, vectorAddField);
 
-    vectorTempBuffer= cl.createBuffer(webcl.MEM_READ_WRITE, bufSize*3);
+    vectorTempBuffer = cl.createBuffer(webcl.MEM_READ_WRITE, bufSize * 3);
 }
 
 function freeBuffers() {
@@ -453,19 +452,15 @@ function freeBuffers() {
 function simResolutionChanged(resolution) {
     running = false;
 
-    if(resolution == 0) {
-        dim = 16
-    }
-    else if(resolution == 1) {
+    if (resolution === 0) {
+        dim = 16;
+    } else if (resolution === 1) {
         dim = 32;
-    }
-    else if(resolution == 2) {
+    } else if (resolution === 2) {
         dim = 64;
-    }
-    else if(resolution == 3) {
+    } else if (resolution === 3) {
         dim = 96;
-    }
-    else if(resolution == 4) {
+    } else if (resolution === 4) {
         dim = 128;
     }
 
@@ -477,21 +472,20 @@ function simResolutionChanged(resolution) {
 function resolutionChanged(resolution) {
     running = false;
 
-  if (!canvas) return;
+    if (!canvas) {
+        return;
+    }
 
-    if(resolution == 0) {
+    if (resolution === 0) {
         canvas.width = 320;
         canvas.height = 240;
-    }
-    else if(resolution == 1) {
+    } else if (resolution === 1) {
         canvas.width = 640;
         canvas.height = 480;
-    }
-    else if(resolution == 2) {
+    } else if (resolution === 2) {
         canvas.width = 800;
         canvas.height = 600;
-    }
-    else if(resolution == 3) {
+    } else if (resolution === 3) {
         canvas.width = 1024;
         canvas.height = 768;
     }
@@ -514,25 +508,26 @@ function deviceChanged(device) {
 
 function pushMatrix(viewer) {
     var copy = mat4.create();
-    mat4.set(viewer.mvMatrix,copy);
+    mat4.set(viewer.mvMatrix, copy);
     matrixStack.push(copy);
 }
 
 function popMatrix(viewer) {
-    if(matrixStack.length > 0) {
+    if (matrixStack.length > 0) {
         viewer.mvMatrix = matrixStack.pop();
     }
 }
 
 function getKernel(src) {
-  var xhr = new XMLHttpRequest();
-  xhr.open("GET", src, false);
-  xhr.send(null);
-  if (xhr.status == 200 ||  //http protocol
-          xhr.status == 0) { //file protocol
-    return xhr.responseText;
-  } else {
-    console.log("XMLHttpRequest error!", xhr);
-    return null;
-  }
+    var xhr = new XMLHttpRequest(), ret = null;
+    xhr.open("GET", src, false);
+    xhr.send(null);
+    if (xhr.status === 200 ||  //http protocol
+            xhr.status === 0) { //file protocol
+        ret = xhr.responseText;
+    } else {
+        console.log("XMLHttpRequest error!", xhr);
+    }
+    
+    return ret;
 }
