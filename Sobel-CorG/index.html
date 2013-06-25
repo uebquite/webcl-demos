@@ -75,14 +75,15 @@
       }
    }
 </script>
-   
-<script>
-function getKernel (id ) {
-   var kernelScript = document.getElementById( id );
-   if(kernelScript === null || kernelScript.type !== "x-kernel")
-      return null;
 
-   return kernelScript.firstChild.textContent;
+<script>
+function getKernel(id) {
+    var kernelScript = document.getElementById(id);
+    if (kernelScript === null || kernelScript.type !== "x-kernel") {
+        return null;
+    }
+
+    return kernelScript.firstChild.textContent;
 }
 </script>
 
@@ -114,293 +115,284 @@ var localThreads  = null;
 var useGPU        = true;
 var types = WebCLKernelArgumentTypes;
 
-function InitWebCL()
-{
-   try{
-      cl = webcl;
+function initWebCL() {
+    try {
+        cl = webcl;
 
-      WebCLCommon.init(useGPU ? "GPU" : "CPU");
-      context = WebCLCommon.createContext();
+        WebCLCommon.init(useGPU ? "GPU" : "CPU");
+        context = WebCLCommon.createContext();
 
-      // Create the compute program from the source buffer
-      //
-      var kernelSource = getKernel("sobel_filter");
-      if (kernelSource === null) {
-         alert("No kernel named: " + "sobel_filter");
-         return;
-      }
+        // Create the compute program from the source buffer
+        //
+        var kernelSource = getKernel("sobel_filter");
+        if (kernelSource === null) {
+            alert("No kernel named: " + "sobel_filter");
+            return;
+        }
 
-      program = WebCLCommon.createProgramBuild(kernelSource);
-      queue = WebCLCommon.createCommandQueue();
+        program = WebCLCommon.createProgramBuild(kernelSource);
+        queue = WebCLCommon.createCommandQueue();
 
-      // Create the compute kernel in the program we wish to run
-      //
-      kernel = program.createKernel("sobel_filter");
-   } catch (e){
-      alert("Error on InitWebCL = " + e.message);
-   }
+        // Create the compute kernel in the program we wish to run
+        //
+        kernel = program.createKernel("sobel_filter");
+    } catch (e) {
+        alert("Error on initWebCL = " + e.message);
+    }
 }
 
-function LoadImage()
-{
-   // Start load of an image from a file
-   //
-   jsInputImage = new Image();
-   jsInputImage.src = "zer512.jpg";
-   jsInputImage.onload = LoadComplete;
+function loadImage() {
+    // Start load of an image from a file
+    //
+    jsInputImage = new Image();
+    jsInputImage.src = "zer512.jpg";
+    jsInputImage.onload = LoadComplete;
 }
 
-function LoadComplete()
-{
-   // Enable filter
-   document.getElementById("btn").disabled = false;
+function LoadComplete() {
+    // Enable filter
+    document.getElementById("btn").disabled = false;
 
-   // Canvas initialization
-   //
-   inputCanvas = document.getElementById("inputCanvas");
-   inputCanvas.width = jsInputImage.width;
-   inputCanvas.height = jsInputImage.height;
-   inputContext = inputCanvas.getContext("2d");
-   inputContext.drawImage(jsInputImage, 0, 0);
+    // Canvas initialization
+    //
+    inputCanvas = document.getElementById("inputCanvas");
+    inputCanvas.width = jsInputImage.width;
+    inputCanvas.height = jsInputImage.height;
+    inputContext = inputCanvas.getContext("2d");
+    inputContext.drawImage(jsInputImage, 0, 0);
 
-   outputCanvas = document.getElementById("outputCanvas");
-   outputCanvas.width = jsInputImage.width;
-   outputCanvas.height = jsInputImage.height;
-   outputContext = outputCanvas.getContext("2d");
-   outputContext.createImageData(jsInputImage.width, jsInputImage.height);
+    outputCanvas = document.getElementById("outputCanvas");
+    outputCanvas.width = jsInputImage.width;
+    outputCanvas.height = jsInputImage.height;
+    outputContext = outputCanvas.getContext("2d");
+    outputContext.createImageData(jsInputImage.width, jsInputImage.height);
 }
 
-function RunFilter()
-{
-   // Reset output image data
-   //
-   var imageData = outputContext.getImageData(0, 0, outputCanvas.width, outputCanvas.height);
-   for(var i=0; i<imageData.data.length; i++)
-      imageData.data[i] = 0;
-   outputContext.putImageData(imageData, 0, 0);
+function runFilter() {
+    // Reset output image data
+    //
+    var imageData = outputContext.getImageData(0, 0, outputCanvas.width, outputCanvas.height);
+    var i;
+    for (i = 0; i < imageData.data.length; i++) {
+        imageData.data[i] = 0;
+    }
+    outputContext.putImageData(imageData, 0, 0);
 
-   var radio = document.getElementById("JSradio");
-   if(radio.checked)
-      RunJavaScriptFilter();
-   else {
-      InitWebCL();
-      RunWebCLFilter();
-   }
+    var radio = document.getElementById("JSradio");
+    if (radio.checked) {
+        runJavaScriptFilter();
+    } else {
+        initWebCL();
+        runWebCLFilter();
+    }
 }
 
-function RunWebCLFilter()
-{
-   try {
-      // Image has loaded so create OpenCL memory objects
-      //
-      var imageData = inputContext.getImageData(0, 0, inputCanvas.width, inputCanvas.height);
-      var nPixels = imageData.data.length;
-      var inputData = new Float32Array(nPixels);
-      for (var i=0; i < nPixels; i++) {
-         inputData[i] = imageData.data[i];
-      }
+function runWebCLFilter() {
+    try {
+        // Image has loaded so create OpenCL memory objects
+        //
+        var imageData = inputContext.getImageData(0, 0, inputCanvas.width, inputCanvas.height);
+        var nPixels = imageData.data.length;
+        var inputData = new Float32Array(nPixels);
+        var i;
+        for (i = 0; i < nPixels; i++) {
+            inputData[i] = imageData.data[i];
+        }
 
-      inputBuffer = context.createBuffer(cl.MEM_READ_ONLY, Float32Array.BYTES_PER_ELEMENT * nPixels);
-      outputBuffer = context.createBuffer(cl.MEM_WRITE_ONLY, Float32Array.BYTES_PER_ELEMENT * nPixels);
+        inputBuffer = context.createBuffer(cl.MEM_READ_ONLY, Float32Array.BYTES_PER_ELEMENT * nPixels);
+        outputBuffer = context.createBuffer(cl.MEM_WRITE_ONLY, Float32Array.BYTES_PER_ELEMENT * nPixels);
 
-      if(inputBuffer === null || outputBuffer === null)
-      {
-         alert("Failed to create buffers");
-         return;
-      }
+        if (inputBuffer === null || outputBuffer === null) {
+            alert("Failed to create buffers");
+            return;
+        }
 
-      // Write our image into the input array in device memory
-      //
-      queue.enqueueWriteBuffer(inputBuffer, true, 0, Float32Array.BYTES_PER_ELEMENT * nPixels, inputData);
+        // Write our image into the input array in device memory
+        //
+        queue.enqueueWriteBuffer(inputBuffer, true, 0, Float32Array.BYTES_PER_ELEMENT * nPixels, inputData);
 
-      var w = jsInputImage.width;
-      var h = jsInputImage.height;
+        var w = jsInputImage.width;
+        var h = jsInputImage.height;
 
-      // Set the arguments to our compute kernel
-      //
-      kernel.setArg(0, inputBuffer);
-      kernel.setArg(1, outputBuffer);
-      kernel.setArg(2, w, types.UINT);
-      kernel.setArg(3, h, types.UINT);
+        // Set the arguments to our compute kernel
+        //
+        kernel.setArg(0, inputBuffer);
+        kernel.setArg(1, outputBuffer);
+        kernel.setArg(2, w, types.UINT);
+        kernel.setArg(3, h, types.UINT);
 
-      // Get the maximum work group size for executing the kernel on the device
-      //
-      var devices = WebCLCommon.getDevices(useGPU ? "GPU" : "CPU");
-      var maxWorkGroupSize = kernel.getWorkGroupInfo(devices[0], cl.KERNEL_WORK_GROUP_SIZE);
-      console.log("maxWorkGroupSize: " + maxWorkGroupSize);
+        // Get the maximum work group size for executing the kernel on the device
+        //
+        var devices = WebCLCommon.getDevices(useGPU ? "GPU" : "CPU");
+        var maxWorkGroupSize = kernel.getWorkGroupInfo(devices[0], cl.KERNEL_WORK_GROUP_SIZE);
+        console.log("maxWorkGroupSize: " + maxWorkGroupSize);
 
-      blockSizeY = 1;
-      blockSizeX = jsInputImage.width;
-      while(blockSizeX > maxWorkGroupSize)
-         blockSizeX = Math.ceil(blockSizeX/2);
+        blockSizeY = 1;
+        blockSizeX = jsInputImage.width;
+        while (blockSizeX > maxWorkGroupSize) {
+            blockSizeX = Math.ceil(blockSizeX / 2);
+        }
 
-      var globalWorkSize = new Int32Array([w,h]);
-      var localWorkSize = new Int32Array([blockSizeX,blockSizeY]);
+        var globalWorkSize = new Int32Array([w, h]);
+        var localWorkSize = new Int32Array([blockSizeX, blockSizeY]);
 
-      console.log("globalWorkSize[0]: " + globalWorkSize[0]);
-      console.log("globalWorkSize[1]: " + globalWorkSize[0]);
-      console.log("localWorkSize[0]: " + localWorkSize[0]);
-      console.log("localWorkSize[1]: " + localWorkSize[1]);
+        console.log("globalWorkSize[0]: " + globalWorkSize[0]);
+        console.log("globalWorkSize[1]: " + globalWorkSize[0]);
+        console.log("localWorkSize[0]: " + localWorkSize[0]);
+        console.log("localWorkSize[1]: " + localWorkSize[1]);
 
-      tStart = new Date().valueOf();
+        tStart = new Date().valueOf();
 
-      queue.enqueueNDRangeKernel(kernel,  0, globalWorkSize, localWorkSize);
+        queue.enqueueNDRangeKernel(kernel, 0, globalWorkSize, localWorkSize);
 
-      // Wait for the command queue to get serviced before reading back results
-      //
-      queue.finish();
-      GetResults();
-   } catch (e) {
-      alert("Error on RunWebCLFilter = " + e.message);
-   }
+        // Wait for the command queue to get serviced before reading back results
+        //
+        queue.finish();
+        getResults();
+    } catch (e) {
+        alert("Error on runWebCLFilter = " + e.message);
+    }
 }
 
-function  GetResults()
-{
-   try {
-      tEnd = new Date().valueOf();
+function getResults() {
+    try {
+        tEnd = new Date().valueOf();
 
-      var imageData = outputContext.getImageData(0, 0, outputCanvas.width, outputCanvas.height);
-      var nPixels = imageData.data.length;
-      var outputData = new Float32Array(nPixels);
+        var imageData = outputContext.getImageData(0, 0, outputCanvas.width, outputCanvas.height);
+        var nPixels = imageData.data.length;
+        var outputData = new Float32Array(nPixels);
 
-      // Read back the results from the device to verify the output
-      //
-      queue.enqueueReadBuffer(outputBuffer, true, 0, Float32Array.BYTES_PER_ELEMENT * nPixels, outputData);
+        // Read back the results from the device to verify the output
+        //
+        queue.enqueueReadBuffer(outputBuffer, true, 0, Float32Array.BYTES_PER_ELEMENT * nPixels, outputData);
 
-      for (var i = 0; i < nPixels; i+=4) {
-         imageData.data[i] = outputData[i];
-         imageData.data[i+1] = outputData[i+1];
-         imageData.data[i+2] = outputData[i+2];
-         imageData.data[i+3] = 255;
-      }
+        var i;
+        for (i = 0; i < nPixels; i += 4) {
+            imageData.data[i] = outputData[i];
+            imageData.data[i + 1] = outputData[i + 1];
+            imageData.data[i + 2] = outputData[i + 2];
+            imageData.data[i + 3] = 255;
+        }
 
-      outputContext.putImageData(imageData, 0, 0);
-      TerminateCL();
-      ShowResults();
+        outputContext.putImageData(imageData, 0, 0);
+        terminateCL();
+        showResults();
 
-   } catch (e) {
-      throw e;
-   }
+    } catch (e) {
+        throw e;
+    }
 }
 
-function TerminateCL()
-{
-   // Shutdown and cleanup
-   // FIXME: Release methods are still not avaiable for WebCL
-   /*
-   if(cl !== null)
-   {
-      inputBuffer.release();
-      outputBuffer.release();
-      program.release();
-      kernel.release();
-      queue.release();
-      context.release();
-   }*/
+function terminateCL() {
+    // Shutdown and cleanup
+    // FIXME: Release methods are still not avaiable for WebCL
+    /*
+    if(cl !== null) {
+        inputBuffer.release();
+        outputBuffer.release();
+        program.release();
+        kernel.release();
+        queue.release();
+        context.release();
+    }*/
 }
 
-function SwitchMode()
-{
-   var radio = document.getElementById("JSradio");
-   if(radio.checked)
-      document.getElementById("corg").style.visibility = "hidden";
-   else
-      document.getElementById("corg").style.visibility = "visible";
+function switchMode() {
+    var radio = document.getElementById("JSradio");
+    if (radio.checked) {
+        document.getElementById("corg").style.visibility = "hidden";
+    } else {
+        document.getElementById("corg").style.visibility = "visible";
+    }
 }
 
-function ShowResults()
-{
-   var delta = Math.max(1, tEnd - tStart);
+function showResults() {
+    var delta = Math.max(1, tEnd - tStart);
 
-   document.getElementById("timeText").firstChild.nodeValue = delta + " ms"
+    document.getElementById("timeText").firstChild.nodeValue = delta + " ms";
 
-   document.getElementById("outputCanvas").style.visibility = "visible";
-   document.getElementById("timeText").style.visibility = "visible";
+    document.getElementById("outputCanvas").style.visibility = "visible";
+    document.getElementById("timeText").style.visibility = "visible";
 }
 
-function HideResults()
-{
-   document.getElementById("outputCanvas").style.visibility = "hidden";
-   document.getElementById("timeText").style.visibility = "hidden";
+function hideResults() {
+    document.getElementById("outputCanvas").style.visibility = "hidden";
+    document.getElementById("timeText").style.visibility = "hidden";
 }
 
-function RunJavaScriptFilter()
-{
-   // For testing, set to true to test basic imageData update
-   var nullFilter = false;
+function runJavaScriptFilter() {
+    // For testing, set to true to test basic imageData update
+    var nullFilter = false;
 
-   var width = inputCanvas.width;
-   var height = inputCanvas.height;
+    var width = inputCanvas.width;
+    var height = inputCanvas.height;
 
-   var inputImageData = inputContext.getImageData(0, 0, width, height);
-   var outputImageData = outputContext.getImageData(0, 0, width, height);
+    var inputImageData = inputContext.getImageData(0, 0, width, height);
+    var outputImageData = outputContext.getImageData(0, 0, width, height);
 
-   var inputPixels = inputImageData.data;
-   var outputPixels = outputImageData.data;
+    var inputPixels = inputImageData.data;
+    var outputPixels = outputImageData.data;
 
-   var I = function(off) { return [inputPixels[off+0]/255, inputPixels[off+1]/255, inputPixels[off+2]/255, inputPixels[off+3]/255]; };
-   var O = function(off, p) { outputPixels[off+0] = 255*p[0]; outputPixels[off+1] = 255*p[1]; outputPixels[off+2] = 255*p[2]; outputPixels[off+3] = 255; };
+    var I = function (off) { return [inputPixels[off] / 255, inputPixels[off + 1] / 255, inputPixels[off + 2] / 255, inputPixels[off + 3] / 255]; };
+    var O = function (off, p) { outputPixels[off] = 255 * p[0]; outputPixels[off + 1] = 255 * p[1]; outputPixels[off + 2] = 255 * p[2]; outputPixels[off + 3] = 255; };
 
-   tStart = new Date().valueOf();
-   for(var x=0; x<width; x++) {
-      for(var y=0; y<height; y++) {
-         var Gx = [0, 0, 0, 0];
-         var Gy = [0, 0, 0, 0];
-         var C =  [0, 0, 0, 0];
+    tStart = new Date().valueOf();
+    var x, y, i;
+    for (x = 0; x < width; x++) {
+        for (y = 0; y < height; y++) {
+            var Gx = [0, 0, 0, 0];
+            var Gy = [0, 0, 0, 0];
+            var C =  [0, 0, 0, 0];
 
-         // Original
-         // var c = x + y * width;
-         var c = (x*4) + (y * width * 4);
+            var c = (x * 4) + (y * width * 4);
 
-         /* Read each texel component and calculate the filtered value using neighbouring texel components */
-         if( x >= 1 && x < (width-1) && y >= 1 && y < height - 1)
-         {
-            var i00 = I(c - 4 - 4*width);
-            var i10 = I(c - 4*width);
-            var i20 = I(c + 4 - 4*width);
-            var i01 = I(c - 4);
-            var i11 = I(c);
-            var i21 = I(c + 4);
-            var i02 = I(c - 4 + 4*width);
-            var i12 = I(c + 4*width);
-            var i22 = I(c + 4 + 4*width);
+            /* Read each texel component and calculate the filtered value using neighbouring texel components */
+            if (x >= 1 && x < (width - 1) && y >= 1 && y < height - 1) {
+                var i00 = I(c - 4 - 4 * width);
+                var i10 = I(c - 4 * width);
+                var i20 = I(c + 4 - 4 * width);
+                var i01 = I(c - 4);
+                var i11 = I(c);
+                var i21 = I(c + 4);
+                var i02 = I(c - 4 + 4 * width);
+                var i12 = I(c + 4 * width);
+                var i22 = I(c + 4 + 4 * width);
 
-            for(var i=0; i<4; i++) {
-               Gx[i] = i00[i] + 2*i10[i] + i20[i] - i02[i] - 2*i12[i] - i22[i];
-               Gy[i] = i00[i] - i20[i] + 2*i01[i] - 2*i21[i] + i02[i] - i22[i];
-               C[i]  = Math.sqrt(Gx[i]*Gx[i] + Gy[i]*Gy[i])/2;
+                for (i = 0; i < 4; i++) {
+                    Gx[i] = i00[i] + 2 * i10[i] + i20[i] - i02[i] - 2 * i12[i] - i22[i];
+                    Gy[i] = i00[i] - i20[i] + 2 * i01[i] - 2 * i21[i] + i02[i] - i22[i];
+                    C[i]  = Math.sqrt(Gx[i] * Gx[i] + Gy[i] * Gy[i]) / 2;
+                }
+
+                // Update outputPixels
+                nullFilter ? O(c, I(c)) : O(c, C);
             }
+        }
+    }
+    tEnd = new Date().valueOf();
 
-            // Update outputPixels
-            nullFilter ? O(c, I(c)) : O(c, C);
-         }
-      }
-   }
-   tEnd = new Date().valueOf();
-
-   outputContext.putImageData(outputImageData, 0, 0);
-   ShowResults();
+    outputContext.putImageData(outputImageData, 0, 0);
+    showResults();
 }
 </script>
 </head>
 
-<body onLoad="LoadImage()" onUnload="TerminateCL()" bgcolor="black">
-<div style="position:absolute; left:0px; top:0px">
+<body onload="loadImage();" onunload="terminateCL();" bgcolor="black">
+<div style="position:absolute; left:0px; top:0px;">
    <div style="position:absolute; left:20px; top:10px; width:128px;">
-      <button id="btn" class="push" onclick="RunFilter()">Run Filter</button>
+      <button id="btn" class="push" onclick="runFilter();">Run Filter</button>
    </div>
-   <div style="position:absolute; left:120px; top:15px;"><input type="radio" name="r1" id="JSradio" onclick="SwitchMode();HideResults()" checked="true"></div>
+   <div style="position:absolute; left:120px; top:15px;"><input type="radio" name="r1" id="JSradio" onclick="switchMode();hideResults();" checked="true"></div>
    <div style="position:absolute; left:140px; top:15px;" class="rad">JavaScript</div>
-   <div style="position:absolute; left:220px; top:15px;"><input type="radio" name="r1" id="WCradio" onclick="SwitchMode();HideResults()"></div>
+   <div style="position:absolute; left:220px; top:15px;"><input type="radio" name="r1" id="WCradio" onclick="switchMode();hideResults();"></div>
    <div style="position:absolute; left:240px; top:15px;" class="rad">WebCL</div>
 
    <div style="position:absolute; left:280px; top:15px; width: 96px; visibility: hidden; " class="info" id="timeText">  ms</div>
 
    <div style="visibility: hidden;" id="corg">
-      <div style="position:absolute; left:420px; top:15px;"><input type="radio" name="r2" id="CPU" onclick="useGPU=false;HideResults()"></div>
+      <div style="position:absolute; left:420px; top:15px;"><input type="radio" name="r2" id="CPU" onclick="useGPU=false;hideResults();"></div>
       <div style="position:absolute; left:440px; top:15px;" class="rad">CPU</div>
-      <div style="position:absolute; left:490px; top:15px;"><input type="radio" name="r2" id="GPU" onclick="useGPU=true;HideResults()" checked="true"></div>
+      <div style="position:absolute; left:490px; top:15px;"><input type="radio" name="r2" id="GPU" onclick="useGPU=true;hideResults();" checked="true"></div>
       <div style="position:absolute; left:510px; top:15px;" class="rad">GPU</div>
    </div>
 
