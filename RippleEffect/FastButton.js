@@ -1,5 +1,5 @@
 // ref: http://code.google.com/mobile/articles/fast_buttons.html
-FastButton = function(element, handler) {
+FastButton = function (element, handler) {
     this.element = element;
     this.handler = handler;
 
@@ -7,16 +7,24 @@ FastButton = function(element, handler) {
     element.addEventListener('click', this, false);
 };
 
-FastButton.prototype.handleEvent = function(event) {
+FastButton.prototype.handleEvent = function (event) {
     switch (event.type) {
-        case 'touchstart': this.onTouchStart(event); break;
-        case 'touchmove': this.onTouchMove(event); break;
-        case 'touchend': this.onClick(event); break;
-        case 'click': this.onClick(event); break;
+    case 'touchstart':
+        this.onTouchStart(event);
+        break;
+    case 'touchmove':
+        this.onTouchMove(event);
+        break;
+    case 'touchend':
+        this.onClick(event);
+        break;
+    case 'click':
+        this.onClick(event);
+        break;
     }
 };
 
-FastButton.prototype.onTouchStart = function(event) {
+FastButton.prototype.onTouchStart = function (event) {
     event.stopPropagation();
 
     this.element.addEventListener('touchend', this, false);
@@ -26,19 +34,19 @@ FastButton.prototype.onTouchStart = function(event) {
     this.startY = event.touches[0].clientY;
 };
 
-FastButton.prototype.onTouchMove = function(event) {
+FastButton.prototype.onTouchMove = function (event) {
     if (Math.abs(event.touches[0].clientX - this.startX) > 10 ||
             Math.abs(event.touches[0].clientY - this.startY) > 10) {
         this.reset();
     }
 };
 
-FastButton.prototype.onClick = function(event) {
+FastButton.prototype.onClick = function (event) {
     event.stopPropagation();
     this.reset();
     this.handler(event);
 
-    if (event.type == 'touchend') {
+    if (event.type === 'touchend') {
         clickbuster.preventGhostClick(this.startX, this.startY);
     }
 };
@@ -50,7 +58,7 @@ FastButton.prototype.reset = function () {
 
 clickbuster = {};
 
-clickbuster.preventGhostClick = function(x, y) {
+clickbuster.preventGhostClick = function (x, y) {
     clickbuster.coordinates.push(x, y);
     window.setTimeout(clickbuster.pop, 2500);
 };
@@ -59,8 +67,9 @@ clickbuster.pop = function () {
     clickbuster.coordinates.splice(0, 2);
 };
 
-clickbuster.onClick = function(event) {
-    for (var i = 0; i < clickbuster.coordinates.length; i += 2) {
+clickbuster.onClick = function (event) {
+    var i;
+    for (i = 0; i < clickbuster.coordinates.length; i += 2) {
         var x = clickbuster.coordinates[i];
         var y = clickbuster.coordinates[i + 1];
         if (Math.abs(event.clientX - x) < 25 && Math.abs(event.clientY - y) < 25) {

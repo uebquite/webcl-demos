@@ -47,12 +47,6 @@ function initCL() {
 
         queue = context.createCommandQueue();
 
-    } catch (e) {
-        console.error(e.message, e);
-        return false;
-    }
-
-    try {
         filterKernel = filterProgram.createKernel("Ripple_kernel");
 
         devices = WebCLCommon.getDevices(deviceType);
@@ -69,12 +63,6 @@ function initCL() {
         nRGBAvals = width * height * 4;
         nBytes = nRGBAvals * Float32Array.BYTES_PER_ELEMENT;
 
-    } catch (e) {
-        console.error("ERROR: "+e.message, e);
-        return false;
-    }
-
-    try {
         inputBuffer = context.createBuffer(cl.MEM_READ_ONLY, nBytes);
         outputBuffer = context.createBuffer(cl.MEM_WRITE_ONLY, nBytes);
         data = new Float32Array(nRGBAvals);
@@ -82,14 +70,15 @@ function initCL() {
         // Write our image into the input array in device memory
         //
         var inputPixels = inputContext.getImageData(0, 0, width, height).data;
-        for (var i = 0; i < nRGBAvals; i++) {
+        var i;
+        for (i = 0; i < nRGBAvals; i++) {
             data[i] = inputPixels[i];
         }
 
         queue.enqueueWriteBuffer(inputBuffer, true, 0, nBytes, data);
 
     } catch (e) {
-        console.error("ERROR: "+e.message);
+        console.error("ERROR: " + e.message, e);
         return false;
     }
 
@@ -110,8 +99,9 @@ function releaseBuffers() {
 }
 
 function runFilterCL(t, cx, cy, diag) {
-    if (isCLActive)
+    if (isCLActive) {
         return;
+    }
 
     isCLActive = true;
     runRippleCL(t, cx, cy, diag);
@@ -157,8 +147,10 @@ function getResults() {
     var outputImageData = outputContext.getImageData(0, 0, width, height);
     var outputPixels = outputImageData.data;
 
-    for (var i = 0; i < nRGBAvals; i++)
+    var i;
+    for (i = 0; i < nRGBAvals; i++) {
         outputPixels[i] = data[i];
+    }
 
     outputContext.putImageData(outputImageData, 0, 0);
 

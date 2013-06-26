@@ -24,25 +24,25 @@ function getKernel(fileName) {
     var xhr = new XMLHttpRequest();
     xhr.open("GET", fileName, false);
     xhr.send();
+    var res = null;
     // HTTP reports success with a 200 status, file protocol reports
     // success with a 0 status
-    if (xhr.status == 200 || xhr.status == 0) {
-        return xhr.responseText;
-    } else {
-        return null;
+    if (xhr.status === 200 || xhr.status === 0) {
+        res = xhr.responseText;
     }
-};
+    return res;
+}
 
 window.requestAnimFrame = (function () {
-          return  window.requestAnimationFrame       ||
-                  window.webkitRequestAnimationFrame ||
-                  window.mozRequestAnimationFrame    ||
-                  window.oRequestAnimationFrame      ||
-                  window.msRequestAnimationFrame     ||
-                  function(/* function */ callback, /* DOMElement */ element){
-                      window.setTimeout(callback, 1000 / 60);
-                  };
-    })();
+    return window.requestAnimationFrame    ||
+        window.webkitRequestAnimationFrame ||
+        window.mozRequestAnimationFrame    ||
+        window.oRequestAnimationFrame      ||
+        window.msRequestAnimationFrame     ||
+        function (callback, element) {
+            window.setTimeout(callback, 1000 / 60);
+        };
+}());
 
 
 function init() {
@@ -54,8 +54,9 @@ function init() {
 }
 
 function release() {
-    if (isCLenabled)
+    if (isCLenabled) {
         releaseBuffers();
+    }
 }
 
 function loadComplete() {
@@ -75,7 +76,7 @@ function loadComplete() {
     outputContext = outputCanvas.getContext("2d");
     outputContext.drawImage(jsInputImage, 0, 0);
 
-    diag = Math.sqrt(width*width + height*height);
+    diag = Math.sqrt(width * width + height * height);
     // attempt to hide URL bar
     window.scrollTo(0, 1);
 
@@ -104,7 +105,7 @@ function loadComplete() {
     showFilterState();
 }
 
-function onMouseMove (e) {
+function onMouseMove(e) {
     if (touchDown) {
         var nx = Math.floor(e.offsetX);
         var ny = Math.floor(e.offsetY);
@@ -115,8 +116,8 @@ function onMouseMove (e) {
     }
 }
 
-function onTouchMove (e) {
-    if (touchDown  && e.targetTouches.length === 1) {
+function onTouchMove(e) {
+    if (touchDown && e.targetTouches.length === 1) {
         var touch = e.targetTouches[0];
         var nx = touch.clientX;
         var ny = touch.clientY;
@@ -142,7 +143,7 @@ function toggleDevice() {
         showFilterState();
         initCL();
         requestAnimFrame(runFilter);
-        }
+    }
 }
 
 function showRunState() {
@@ -150,8 +151,9 @@ function showRunState() {
 }
 
 function toggleFilter() {
-    if (!isCLenabled)
+    if (!isCLenabled) {
         return;
+    }
 
     useJS = !useJS;
     useGPU = useJS ? false : useGPU;
@@ -170,15 +172,18 @@ function runFilter() {
     }
 
     var imageData = outputContext.getImageData(0, 0, width, height);
-    for (var i = 0; i < imageData.data.length; i++)
+    var i;
+    for (i = 0; i < imageData.data.length; i++) {
         imageData.data[i] = 0;
+    }
 
     outputContext.putImageData(imageData, 0, 0);
 
-    if (useJS)
+    if (useJS) {
         runFilterJS(t, cx, cy, diag);
-    else
+    } else {
         runFilterCL(t, cx, cy, diag);
+    }
 
     t++;
     requestAnimFrame(runFilter);
@@ -188,7 +193,7 @@ function showResults() {
     var delta = Math.max(1, tEnd - tStart);
     var fps = Math.floor(1000 / delta);
 
-    document.getElementById("msec").firstChild.nodeValue = fps + " fps"
+    document.getElementById("msec").firstChild.nodeValue = fps + " fps";
     document.getElementById("msec").style.visibility = "visible";
 }
 
