@@ -1,9 +1,7 @@
-<!--
-    Based on: https://github.com/MatiasPiispanen/SmallPT-WebCL
--->
 <!DOCTYPE html>
 <html lang="en">
     <head>
+        <!-- Based on: https://github.com/MatiasPiispanen/SmallPT-WebCL -->
         <meta charset="utf-8" />
         <!-- Always force latest IE rendering engine (even in intranet) & Chrome Frame
         Remove this if you use the .htaccess -->
@@ -22,20 +20,20 @@
 
         <script type="text/javascript" src="webcl-smallpt.js"></script>
     </head>
-    <body onload="initPathTracing()" onkeydown="keyFunc(event)">
+    <body onload="initPathTracing();" onkeydown="keyFunc(event);">
         <div>
             <header>
                 <h1>WebCL SmallptGPU</h1>
             </header>
-                <canvas id="canvas" width="640" height="480" style="position:relative; left=0px; width=50%"></canvas>
+                <canvas id="canvas" width="640" height="480" style="position:relative; left:0px; width:50%;"></canvas>
                 <div>
-                  <button type="button" onclick="reset()">Reset</button>
-                  <button type="button" id="stop" onclick="stop()">Stop</button>
-                  GPU<input type="radio" name="device" id="GPUradio" onclick="toogleDevice('GPU')" checked="true">
-                  CPU<input type="radio" name="device" id="CPUradio" onclick="toogleDevice('CPU')">
+                  <button type="button" onclick="reset();">Reset</button>
+                  <button type="button" id="stop" onclick="stop();">Stop</button>
+                  GPU<input type="radio" name="device" id="GPUradio" onclick="toogleDevice('GPU');" checked="true">
+                  CPU<input type="radio" name="device" id="CPUradio" onclick="toogleDevice('CPU');">
                 </div>
                 <p>Canvas resolution:</p>
-                <select id="resolution" onchange="resolutionChanged(this.selectedIndex)">
+                <select id="resolution" onchange="resolutionChanged(this.selectedIndex);">
                 <option>320x240</option>
                 <option selected="selected">640x480</option>
                 <option>800x600</option>

@@ -52,12 +52,12 @@ function xhrLoad(uri) {
     xhr.send();
     // HTTP reports success with a 200 status, file protocol reports
     // success with a 0 status
-    if (xhr.status == 200 || xhr.status == 0) {
+    if (xhr.status === 200 || xhr.status === 0) {
         return xhr.responseText;
-    } else {
-        return null;
     }
-};
+
+    return null;
+}
 
 requestAnimationFrame = window.requestAnimationFrame ||
                             window.mozRequestAnimationFrame ||
@@ -68,7 +68,7 @@ requestAnimationFrame = window.requestAnimationFrame ||
 var start = window.mozAnimationStartTime;  // Only supported in FF. Other browsers can use something like Date.now(). 
 
 function toogleDevice(device) {
-    useGPU = (device == 'CPU') ? false : true;
+    useGPU = (device === 'CPU') ? false : true;
     initWebCL();
 }
 
@@ -84,7 +84,7 @@ function initPathTracing() {
 }
 
 function step(timestamp) {
-    if(running == true) {
+    if (running === true) {
         jsTime = Date.now() - prevTime - clTime - clMemTime - elapsedTime;
         prevTime = Date.now();
         htmlConsole.innerHTML = "webcl (ms): " + clTime + "<br>webcl memory transfer (ms): " + clMemTime + "<br>JS (ms): " + jsTime;
@@ -155,11 +155,10 @@ function reset() {
 }
 
 function stop() {
-    if(running) {
+    if (running) {
         running = false;
         document.getElementById("stop").innerHTML = "Start";
-    }
-    else {
+    } else {
         running = true;
         requestAnimationFrame(step, canvas);
         document.getElementById("stop").innerHTML = "Stop";
@@ -169,15 +168,13 @@ function stop() {
 function resolutionChanged(resolution) {
     running = false;
 
-    if(resolution == 0) {
+    if (resolution === 0) {
         canvas.width = 320;
         canvas.height = 240;
-    }
-    else if(resolution == 1) {
+    } else if (resolution === 1) {
         canvas.width = 640;
         canvas.height = 480;
-    }
-    else if(resolution == 2) {
+    } else if (resolution === 2) {
         canvas.width = 800;
         canvas.height = 600;
     }
@@ -215,13 +212,16 @@ function keyFunc(event) {
     var d = 68;
     var r = 82;
     var f = 70;
+    var t;
+    var dir;
+    var sArray;
 
     var pgup = 33;
     var pgdown = 34;
 
-    switch(key) {
+    switch (key) {
     case up:
-        var t = vec3.create(camera.target);
+        t = vec3.create(camera.target);
         vec3.subtract(t, camera.orig, t);
         t[1] = t[1] * Math.cos(-ROTATE_STEP) + t[2] * Math.sin(-ROTATE_STEP);
         t[2] = -t[1] * Math.sin(-ROTATE_STEP) + t[2] * Math.cos(-ROTATE_STEP);
@@ -230,7 +230,7 @@ function keyFunc(event) {
         reInit();
         break;
     case down:
-        var t = vec3.create(camera.target);
+        t = vec3.create(camera.target);
         vec3.subtract(t, camera.orig, t);
         t[1] = t[1] * Math.cos(ROTATE_STEP) + t[2] * Math.sin(ROTATE_STEP);
         t[2] = -t[1] * Math.sin(ROTATE_STEP) + t[2] * Math.cos(ROTATE_STEP);
@@ -239,7 +239,7 @@ function keyFunc(event) {
         reInit();
         break;
     case left:
-        var t = vec3.create(camera.target);
+        t = vec3.create(camera.target);
         vec3.subtract(t, camera.orig, t);
         t[0] = t[0] * Math.cos(-ROTATE_STEP) - t[2] * Math.sin(-ROTATE_STEP);
         t[2] = t[0] * Math.sin(-ROTATE_STEP) + t[2] * Math.cos(-ROTATE_STEP);
@@ -248,7 +248,7 @@ function keyFunc(event) {
         reInit();
         break;
     case right:
-        var t = vec3.create(camera.target);
+        t = vec3.create(camera.target);
         vec3.subtract(t, camera.orig, t);
         t[0] = t[0] * Math.cos(ROTATE_STEP) - t[2] * Math.sin(ROTATE_STEP);
         t[2] = t[0] * Math.sin(ROTATE_STEP) + t[2] * Math.cos(ROTATE_STEP);
@@ -265,14 +265,14 @@ function keyFunc(event) {
         reInit();
         break;
     case w:
-        var dir = vec3.create(camera.dir);
+        dir = vec3.create(camera.dir);
         vec3.scale(dir, MOVE_STEP);
         vec3.add(camera.orig, dir, camera.orig);
         vec3.add(camera.target, dir, camera.target);
         reInit();
         break;
     case a:
-        var dir = vec3.create(camera.x);
+        dir = vec3.create(camera.x);
         vec3.normalize(dir);
         vec3.scale(dir, -MOVE_STEP);
         vec3.add(camera.orig, dir, camera.orig);
@@ -280,14 +280,14 @@ function keyFunc(event) {
         reInit();
         break;
     case s:
-        var dir = vec3.create(camera.dir);
+        dir = vec3.create(camera.dir);
         vec3.scale(dir, -MOVE_STEP);
         vec3.add(camera.orig, dir, camera.orig);
         vec3.add(camera.target, dir, camera.target);
         reInit();
-        break;;
+        break;
     case d:
-        var dir = vec3.create(camera.x);
+        dir = vec3.create(camera.x);
         vec3.normalize(dir);
         vec3.scale(dir, MOVE_STEP);
         vec3.add(camera.orig, dir, camera.orig);
@@ -305,32 +305,32 @@ function keyFunc(event) {
         reInit();
         break;
     case four:
-        var sArray = scene.getSpheres();
+        sArray = scene.getSpheres();
         sArray[currentSphere].p[0] -= 0.5 * MOVE_STEP;
         reInitScene();
         break;
     case six:
-        var sArray = scene.getSpheres();
+        sArray = scene.getSpheres();
         sArray[currentSphere].p[0] += 0.5 * MOVE_STEP;
         reInitScene();
         break;
     case eight:
-        var sArray = scene.getSpheres();
+        sArray = scene.getSpheres();
         sArray[currentSphere].p[2] -= 0.5 * MOVE_STEP;
-        reInitScene(); 
+        reInitScene();
         break;
     case two:
-        var sArray = scene.getSpheres();
+        sArray = scene.getSpheres();
         sArray[currentSphere].p[2] += 0.5 * MOVE_STEP;
-        reInitScene(); 
+        reInitScene();
         break;
     case nine:
-        var sArray = scene.getSpheres();
+        sArray = scene.getSpheres();
         sArray[currentSphere].p[1] += 0.5 * MOVE_STEP;
         reInitScene();
         break;
     case three:
-        var sArray = scene.getSpheres();
+        sArray = scene.getSpheres();
         sArray[currentSphere].p[1] -= 0.5 * MOVE_STEP;
         reInitScene();
         break;
@@ -373,7 +373,7 @@ function releaseBuffers() {
         clKernel = 0;
         cl = 0;
     }
-}    
+}
 
 
 function allocateBuffers() {
@@ -396,11 +396,11 @@ function allocateBuffers() {
     pixelArray = new Int32Array(pBuffer);
 
     var seeds = new Uint32Array(pixelCount * 2);
-
-    for(var i = 0; i < pixelCount * 2; i++) {
+    var i;
+    for (i = 0; i < pixelCount * 2; i++) {
         seeds[i] = Math.random() * maxint;
 
-        if(seeds[i] < 2) {
+        if (seeds[i] < 2) {
             seeds[i] = 2;
         }
     }
@@ -418,23 +418,25 @@ function allocateBuffers() {
 }
 
 function clDeviceQuery() {
-  var deviceList = [];
-  var platforms = (window.webcl && webcl.getPlatforms()) || [];
-  for (var p = 0, i = 0; p < platforms.length; p++) {
-    var plat = platforms[p];
-    var devices = plat.getDevices(useGPU ? webcl.DEVICE_TYPE_GPU : webcl.DEVICE_TYPE_CPU);
-    for (var d = 0; d < devices.length; d++, i++) {
-      if (devices[d].getInfo(webcl.DEVICE_AVAILABLE) === true) {
-        var availableDevice = { 'device' : devices[d],
-                                'type' : devices[d].getInfo(webcl.DEVICE_TYPE),
-                                'platform' : plat };
-        deviceList.push(availableDevice);
-      }
+    var deviceList = [];
+    var platforms = (window.webcl && webcl.getPlatforms()) || [];
+    var p;
+    for (p = 0, i = 0; p < platforms.length; p++) {
+        var plat = platforms[p];
+        var devices = plat.getDevices(useGPU ? webcl.DEVICE_TYPE_GPU : webcl.DEVICE_TYPE_CPU);
+        var d;
+        for (d = 0; d < devices.length; d++, i++) {
+            if (devices[d].getInfo(webcl.DEVICE_AVAILABLE) === true) {
+                var availableDevice = { 'device' : devices[d],
+                        'type' : devices[d].getInfo(webcl.DEVICE_TYPE),
+                        'platform' : plat };
+                deviceList.push(availableDevice);
+            }
+        }
     }
-  }
 
-  return deviceList;
-};
+    return deviceList;
+}
 
 function initWebCL() {
 
@@ -458,7 +460,7 @@ function initWebCL() {
         cl = webcl.createContext(contextProperties);
         clQueue = cl.createCommandQueue(selectedDevice, null);
         allocateBuffers();
-    } catch(e) {
+    } catch (e) {
         alert("Error initializing WebCL : " + e.message);
     }
 
@@ -466,10 +468,11 @@ function initWebCL() {
         clSrc = xhrLoad("rendering_kernel.cl");
         clProgram = cl.createProgram(clSrc);
         clProgram.build(selectedDevice);
-    } catch(e) {
+    } catch (err) {
         alert("Failed to build webcl program. Error " +
-          clProgram.getBuildInfo(selectedDevice, webcl.PROGRAM_BUILD_STATUS) +
+            clProgram.getBuildInfo(selectedDevice, webcl.PROGRAM_BUILD_STATUS) +
             ":  " + clProgram.getBuildInfo(selectedDevice, webcl.PROGRAM_BUILD_LOG));
+        throw err;
     }
 
     clKernel = clProgram.createKernel("RadianceGPU");
@@ -481,7 +484,7 @@ function executeKernel() {
     var globalThreads = canvas.width * canvas.height;
     var globalWorkSize = new Int32Array(1);
 
-    if(globalThreads % wgSize !== 0) {
+    if (globalThreads % wgSize !== 0) {
         globalThreads = (Math.floor(globalThreads / wgSize) + 1) * wgSize;
     }
 
@@ -507,8 +510,7 @@ function executeKernel() {
         clQueue.enqueueNDRangeKernel(clKernel, 0, globalWorkSize, localWorkSize);
         clQueue.finish();
         clTime += Date.now() - start;
-    }
-    catch(e) {
+    } catch (e) {
         htmlConsole.innerHTML = e.message;
     }
 }
@@ -520,18 +522,17 @@ function updateRendering() {
     if (currentSample < 20) {
         executeKernel();
         currentSample += 1;
-    }
-    else {
+    } else {
         var k = Math.min(currentSample - 20, 100) / 100.0;
         var thresholdTime = 0.5 * k;
 
-        for(;;) {
+        for (;;) {
             executeKernel();
             clQueue.finish();
             currentSample += 1;
 
-            var elapsedTime = Date.now() - startTime;
-            if(elapsedTime > thresholdTime) {
+            elapsedTime = Date.now() - startTime;
+            if (elapsedTime > thresholdTime) {
                 break;
             }
         }

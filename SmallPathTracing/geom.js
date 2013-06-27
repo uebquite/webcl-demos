@@ -31,7 +31,7 @@ function Sphere(r, a, b, c, ref) {
 
     this.refl;
 
-    if(r && a && b && c) {
+    if (r && a && b && c) {
         this.rad = r;
 
         vec3.set(a, this.p);

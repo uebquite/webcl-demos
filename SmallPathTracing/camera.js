@@ -13,7 +13,7 @@ function Camera() {
     this.y = vec3.create();
 }
 
-Camera.prototype.getBuffer = function() {
+Camera.prototype.getBuffer = function () {
     var buffer = new Float32Array(15);
 
     buffer[0] = this.orig[0];

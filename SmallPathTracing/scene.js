@@ -6,7 +6,7 @@ var WALL_RAD = 10000;
 
 function Scene(spheres) {
     this.spheres = [];
-    if(spheres == undefined) {
+    if (spheres === undefined) {
         this.spheres[0] = new Sphere(WALL_RAD, [WALL_RAD + 1.0, 40.8, 81.6], [0.0, 0.0, 0.0], [0.75, 0.25, 0.25], Refl.DIFF);
         this.spheres[1] = new Sphere(WALL_RAD, [-WALL_RAD + 99.0, 40.8, 81.6], [0.0, 0.0, 0.0], [0.25, 0.25, 0.25], Refl.DIFF);
         this.spheres[2] = new Sphere(WALL_RAD, [50.0, 40.8, WALL_RAD], [0.0, 0.0, 0.0], [0.75, 0.75, 0.75], Refl.DIFF);
@@ -19,18 +19,19 @@ function Scene(spheres) {
     }
 }
 
-Scene.prototype.getSpheres = function() {
+Scene.prototype.getSpheres = function () {
     return this.spheres;
-}
+};
 
-Scene.prototype.getSphereCount = function() {
+Scene.prototype.getSphereCount = function () {
     return this.spheres.length;
-}
+};
 
-Scene.prototype.getBuffer = function() {
+Scene.prototype.getBuffer = function () {
     var buffer = new Float32Array(this.spheres.length * 11);
+    var i;
 
-    for(var i = 0; i < this.spheres.length; i++) {
+    for (i = 0; i < this.spheres.length; i++) {
         buffer[i * 11] = this.spheres[i].rad;
         buffer[i * 11 + 1] = this.spheres[i].p[0];
         buffer[i * 11 + 2] = this.spheres[i].p[1];
@@ -45,4 +46,4 @@ Scene.prototype.getBuffer = function() {
     }
 
     return buffer;
-}
+};
