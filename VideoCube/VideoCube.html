@@ -38,9 +38,9 @@ body {
 <script type="text/javascript" src="sobelCL.js"> </script>
 
 <script id="vshader" type="x-shader/x-vertex">
-#ifdef GL_ES
-    precision mediump float;
-#endif
+    #ifdef GL_ES
+        precision mediump float;
+    #endif
     uniform mat4 u_modelViewProjMatrix;
     uniform mat4 u_normalMatrix;
     uniform vec3 lightDir;
@@ -62,9 +62,9 @@ body {
 </script>
 
 <script id="fshader" type="x-shader/x-fragment">
-#ifdef GL_ES
-    precision mediump float;
-#endif
+    #ifdef GL_ES
+        precision mediump float;
+    #endif
     uniform sampler2D sampler2d;
 
     varying float v_Dot;
@@ -97,8 +97,7 @@ body {
 
         /* Read each texel component and calculate the filtered 
         value using neighbouring texel components */
-        if( x >= 1 && x < (width-1) && y >= 1 && y < height - 1)
-        {
+        if (x >= 1 && x < (width - 1) && y >= 1 && y < height - 1) {
             float i00[4];
             float i10[4];
             float i20[4];
@@ -108,23 +107,23 @@ body {
             float i02[4];
             float i12[4];
             float i22[4];
-            for(k=0; k<4; k++) {
-                i00[k] = (float) input[(c - 4 - 4*width)+k];
-                i10[k] = (float) input[(c - 4*width)+k];
-                i20[k] = (float) input[(c + 4 - 4*width)+k];
-                i01[k] = (float) input[(c - 4)+k];
-                i11[k] = (float) input[c+k];
-                i21[k] = (float) input[(c + 4)+k];
-                i02[k] = (float) input[(c - 4 + 4*width)+k];
-                i12[k] = (float) input[(c + 4*width)+k];
-                i22[k] = (float) input[(c + 4 + 4*width)+k];
+            for (k=0; k<4; k++) {
+                i00[k] = (float) input[(c - 4 - 4 * width) + k];
+                i10[k] = (float) input[(c - 4 * width) + k];
+                i20[k] = (float) input[(c + 4 - 4 * width) + k];
+                i01[k] = (float) input[(c - 4) + k];
+                i11[k] = (float) input[c + k];
+                i21[k] = (float) input[(c + 4) + k];
+                i02[k] = (float) input[(c - 4 + 4 * width) + k];
+                i12[k] = (float) input[(c + 4 * width) + k];
+                i22[k] = (float) input[(c + 4 + 4 * width) + k];
 
-                Gx[k] = i00[k] + 2*i10[k] + i20[k] - i02[k] - 2*i12[k] - i22[k];
+                Gx[k] = i00[k] + 2 * i10[k] + i20[k] - i02[k] - 2 * i12[k] - i22[k];
 
-                Gy[k] = i00[k] - i20[k] + 2*i01[k] - 2*i21[k] + i02[k] - i22[k];
+                Gy[k] = i00[k] - i20[k] + 2 * i01[k] - 2 * i21[k] + i02[k] - i22[k];
 
                 /* taking root of sums of squares of Gx and Gy */
-                output[c+k] = (float) (hypot(Gx[k], Gy[k]))/2;
+                output[c + k] = (float) (hypot(Gx[k], Gy[k])) / 2;
             }
         }
     }
@@ -166,15 +165,20 @@ body {
     }
     var userData = new UserData();
 
-    function InitGL() {
+    function initGL() {
         // Initialize
         var gl = initWebGL(
-            "glCanvas",                           // the id of the Canvas Element
-            "vshader", "fshader",                 // the ids of the vertex and fragment shaders
-            [ "vNormal", "vColor", "vPosition"],  // shader attribute names in the order they appear
-            [ 1, 1, 1, 1 ], 10000);               // the clear color and depth values
+            "glCanvas",                             // the id of the Canvas Element
+            "vshader",                              // the ids of the vertex and fragment shaders
+            "fshader",
+            [ "vNormal", "vColor", "vPosition"],    // shader attribute names in the order they appear
+            [ 1, 1, 1, 1 ],                         // the clear color and depth values
+            10000
+        );
 
-        if(gl === null) return null;
+        if (gl === null) {
+            return null;
+        }
 
         // Set some uniform variables for the shaders
         gl.uniform3f(gl.getUniformLocation(gl.program, "lightDir"), 0, 0, 1);
@@ -227,7 +231,7 @@ body {
         // Set the viewport and projection matrix for the scene
         gl.viewport(0, 0, myWidth, myHeight);
         gl.perspectiveMatrix = new J3DIMatrix4();
-        gl.perspectiveMatrix.perspective(30, myWidth/myHeight, 1, 10000);
+        gl.perspectiveMatrix.perspective(30, myWidth / myHeight, 1, 10000);
         gl.perspectiveMatrix.lookat(0, 0, 7, 0, 0, 0, 0, 1, 0);
 
         return gl;
@@ -236,15 +240,17 @@ body {
     function drawPicture(gl) {
         userData.fpsSampler.markFrame();
 
-        if(gl === null) return;
+        if (gl === null) {
+            return;
+        }
 
         // Clear the canvas
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
         // Make a model/view matrix.
         gl.mvMatrix.makeIdentity();
-        gl.mvMatrix.rotate(20, 1,0,0);
-        gl.mvMatrix.rotate(userData.currentAngle, 0,1,0);
+        gl.mvMatrix.rotate(20, 1, 0, 0);
+        gl.mvMatrix.rotate(userData.currentAngle, 0, 1, 0);
 
         // Construct the normal matrix from the model-view matrix and pass it in
         gl.normalMatrix.load(gl.mvMatrix);
@@ -265,12 +271,13 @@ body {
         gl.flush();
 
         userData.currentAngle += ANGLE_DELTA;
-        if (userData.currentAngle > 360)
+        if (userData.currentAngle > 360) {
             userData.currentAngle -= 360;
+        }
     }
 
     function updateTexture(gl) {
-        if(userData.filterMode === NO_FILTER) {
+        if (userData.filterMode === NO_FILTER) {
             gl.bindTexture(gl.TEXTURE_2D, userData.videoTexture);
             gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA,
@@ -280,12 +287,10 @@ body {
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        }
-
-        else if(userData.filterMode === JS_FILTER) {
+        } else if (userData.filterMode === JS_FILTER) {
             // sg: copy <video> frame to <canvas>
             userData.videoContext.drawImage(userData.video, 0, 0, 128, 128);
-            SobelJS(userData.videoCanvas, userData.filterCanvas,
+            sobelJS(userData.videoCanvas, userData.filterCanvas,
                 userData.videoContext, userData.filterContext);
 
             gl.bindTexture(gl.TEXTURE_2D, userData.filterTexture);
@@ -297,12 +302,10 @@ body {
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        }
-
-        else if(userData.filterMode === CL_FILTER && userData.cl !== null) {
+        } else if (userData.filterMode === CL_FILTER && userData.cl !== null) {
             // sg: copy <video> frame to <canvas>
             userData.videoContext.drawImage(userData.video, 0, 0, 128, 128);
-            SobelCL(userData.cl, userData.videoCanvas, userData.filterCanvas,
+            sobelCL(userData.cl, userData.videoCanvas, userData.filterCanvas,
                 userData.videoContext, userData.filterContext);
 
             gl.bindTexture(gl.TEXTURE_2D, userData.filterTexture);
@@ -318,40 +321,45 @@ body {
     }
 
     function start() {
-        userData.gl = InitGL();
-        userData.cl = InitCL(useGpu);
+        try {
+            userData.gl = initGL();
+            userData.cl = initCL(useGpu);
 
-        if(userData.gl === null) {
-            console.error("Error on InitGL");
-            return null;
+            if (userData.gl === null) {
+                console.error("Error on InitGL");
+                return null;
+            }
+
+            if (userData.cl === null) {
+                console.error("Error on InitCL");
+                return null;
+            }
+
+            userData.videoCanvas = document.getElementById("videoCanvas");
+            userData.videoContext = userData.videoCanvas.getContext("2d");
+
+
+            userData.filterCanvas = document.getElementById("filterCanvas");
+            userData.filterContext = userData.filterCanvas.getContext("2d");
+
+            userData.video = document.getElementById("video");
+            userData.video.volume = 0;
+
+            userData.fpsSampler = new FpsSampler(SAMPLEPERIOD, "fps");
+
+            showFilterMode();
+            setInterval(function () { drawPicture(userData.gl); }, 10);
+            setInterval(function () { userData.fpsSampler.display(); }, DISPLAYPERIOD);
+        } catch (e) {
+            alert("Error on load = " + e.message);
         }
-
-        if(userData.cl === null) {
-            console.error("Error on InitCL");
-            return null;
-        }
-
-        userData.videoCanvas = document.getElementById("videoCanvas");
-        userData.videoContext = userData.videoCanvas.getContext("2d");
-
-
-        userData.filterCanvas = document.getElementById("filterCanvas");
-        userData.filterContext = userData.filterCanvas.getContext("2d");
-
-        userData.video = document.getElementById("video");
-        userData.video.volume = 0;
-
-        userData.fpsSampler = new FpsSampler(SAMPLEPERIOD, "fps");
-
-        showFilterMode();
-        setInterval(function() { drawPicture(userData.gl) }, 10);
-        setInterval(function() { userData.fpsSampler.display(); }, DISPLAYPERIOD);
     }
 
     function toggleFilterMode() {
         userData.filterMode += 1;
-        if(userData.filterMode > NUM_FILTER_MODES)
+        if (userData.filterMode > NUM_FILTER_MODES) {
             userData.filterMode = NO_FILTER;
+        }
         showFilterMode();
     }
 
@@ -359,15 +367,13 @@ body {
         var fm = document.getElementById("fm");
         var radioBtns = document.getElementById("deviceSwitch");
 
-        if(userData.filterMode === NO_FILTER) {
+        if (userData.filterMode === NO_FILTER) {
             fm.firstChild.nodeValue = "No Filter";
             radioBtns.style.visibility = "hidden";
-        }
-        else if(userData.filterMode === JS_FILTER) {
+        } else if (userData.filterMode === JS_FILTER) {
             fm.firstChild.nodeValue = "JavaScript";
             radioBtns.style.visibility = "hidden";
-        }
-        else {
+        } else {
             fm.firstChild.nodeValue = "WebCL";
             radioBtns.style.visibility = "visible";
         }
@@ -376,15 +382,15 @@ body {
     function resetCube() {
         userData.cl = null;
         resetBuffersCL();
-        userData.cl = InitCL(useGpu);
+        userData.cl = initCL(useGpu);
     }
 
 </script>
 </head>
 
-<body onload="start()">
+<body onload="start();">
 
-<div style="position:absolute; left:0px; top:0px">
+<div style="position:absolute; left:0px; top:0px;">
     <canvas id="glCanvas" style="position:absolute; left:0px; top:0px;" width="800" height="480">
     </canvas>
 
@@ -396,20 +402,20 @@ body {
 
     <div class="info" style="position:absolute; left: 10px; top:45px;">
         <button id ="b1" type="button"  class="btn" style="width:200px;"
-            onClick="toggleFilterMode()">Toggle Filter Mode</button>
+            onclick="toggleFilterMode();">Toggle Filter Mode</button>
     </div>
 </div>
 
 <div style="visibility: hidden;" id="deviceSwitch">
-    <div style="position:absolute; left:430px; top:15px;"><input type="radio" name="r2" id="CPU" 
-        onclick="useGpu=false;resetCube()"></div>
+    <div style="position:absolute; left:430px; top:15px;"><input type="radio" name="r2" id="CPU"
+        onclick="useGpu=false;resetCube();"></div>
     <div style="position:absolute; left:450px; top:15px;" class="rad">CPU</div>
-    <div style="position:absolute; left:500px; top:15px;"><input type="radio" name="r2" id="GPU" 
-        onclick="useGpu=true;resetCube()" checked="true"></div>
+    <div style="position:absolute; left:500px; top:15px;"><input type="radio" name="r2" id="GPU"
+        onclick="useGpu=true;resetCube();" checked="true"></div>
     <div style="position:absolute; left:520px; top:15px;" class="rad">GPU</div>
 </div>
 
-<div style="visibility:hidden">
+<div style="visibility:hidden;">
     <video id="video" src="robots.mp4" autoplay loop></video>
     <canvas id="videoCanvas" width="128" height="128"></canvas>
     <canvas id="filterCanvas" width="128" height="128"></canvas>

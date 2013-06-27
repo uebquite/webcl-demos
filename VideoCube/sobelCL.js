@@ -1,8 +1,8 @@
-
-function getKernel (id ) {
-    var kernelScript = document.getElementById( id );
-    if(kernelScript === null || kernelScript.type !== "x-kernel")
+function getKernel(id) {
+    var kernelScript = document.getElementById(id);
+    if (kernelScript === null || kernelScript.type !== "x-kernel") {
         return null;
+    }
 
     return kernelScript.firstChild.textContent;
 }
@@ -32,22 +32,19 @@ var localWorkSize = null;
 var types = WebCLKernelArgumentTypes;
 
 
-function InitCL(useGpu)
-{
+function initCL(useGpu) {
     try {
 
         // Create the compute program from the source buffer
         //
         var kernelSource = getKernel("sobel_filter");
         var deviceType = useGpu ? "GPU" : "CPU";
-        
+
         if (kernelSource === null) {
             console.error("No kernel named: " + "sobel_filter");
             return null;
         }
 
-        
-        
         WebCLCommon.init(deviceType);
         device_ids = WebCLCommon.getDevices(deviceType);
         device_id = device_ids[0];
@@ -67,32 +64,32 @@ function InitCL(useGpu)
     }
 }
 
-function SobelCL(cl, inputCanvas, outputCanvas, inputContext, outputContext)
-{
+function sobelCL(cl, inputCanvas, outputCanvas, inputContext, outputContext) {
     try {
         // Image has loaded so create OpenCL memory objects
         //
+        var i;
         var imageData = inputContext.getImageData(0, 0, inputCanvas.width, inputCanvas.height);
         var nPixels = imageData.data.length;
 
-        if(inputData === null) {
+        if (inputData === null) {
             inputData = new Float32Array(nPixels);
         }
-        for (var i=0; i < nPixels; i++) {
+        for (i = 0; i < nPixels; i++) {
             inputData[i] = imageData.data[i];
         }
 
-        if(inputBuffer === null) {
+        if (inputBuffer === null) {
             inputBuffer = context.createBuffer(cl.MEM_READ_ONLY,
                 Float32Array.BYTES_PER_ELEMENT * nPixels);
         }
 
-        if(outputBuffer === null) {
+        if (outputBuffer === null) {
             outputBuffer = context.createBuffer(cl.MEM_WRITE_ONLY,
                 Float32Array.BYTES_PER_ELEMENT * nPixels);
         }
 
-        if(inputBuffer === null || outputBuffer === null) {
+        if (inputBuffer === null || outputBuffer === null) {
             console.error("Failed to create buffers");
             return;
         }
@@ -101,7 +98,6 @@ function SobelCL(cl, inputCanvas, outputCanvas, inputContext, outputContext)
         //
         queue.enqueueWriteBuffer(inputBuffer, true, 0,
             Float32Array.BYTES_PER_ELEMENT * nPixels, inputData);
-
 
         var w = inputCanvas.width;
         var h = inputCanvas.height;
@@ -113,11 +109,11 @@ function SobelCL(cl, inputCanvas, outputCanvas, inputContext, outputContext)
         kernel.setArg(2, w, types.UINT);
         kernel.setArg(3, h, types.UINT);
 
-        if(globalWorkSize === null || localWorkSize == null) {
+        if (globalWorkSize === null || localWorkSize === null) {
             // Get the maximum work group size for executing the kernel on the device
             //
             var workGroupSize = kernel.getWorkGroupInfo(device_id, cl.KERNEL_WORK_GROUP_SIZE);
-            if(workGroupSize < inputCanvas.width) {
+            if (workGroupSize < inputCanvas.width) {
                 console.error("Max work group size is too small: " + workGroupSize);
                 return;
             }
@@ -127,7 +123,7 @@ function SobelCL(cl, inputCanvas, outputCanvas, inputContext, outputContext)
             //
             blockSizeX = inputCanvas.width;
             blockSizeY = 1;
-            if(blockSizeX * blockSizeY > workGroupSize) {
+            if (blockSizeX * blockSizeY > workGroupSize) {
                 console.error("Block sizes are too big");
                 return;
             }
@@ -145,7 +141,7 @@ function SobelCL(cl, inputCanvas, outputCanvas, inputContext, outputContext)
         imageData = outputContext.getImageData(0, 0, outputCanvas.width, outputCanvas.height);
         nPixels = imageData.data.length;
 
-        if(outputData === null) {
+        if (outputData === null) {
             outputData = new Float32Array(nPixels);
         }
 
@@ -156,15 +152,15 @@ function SobelCL(cl, inputCanvas, outputCanvas, inputContext, outputContext)
             Float32Array.BYTES_PER_ELEMENT * nPixels, outputData);
         queue.finish();
 
-        for (var i = 0; i < nPixels; i+=4) {
+        for (i = 0; i < nPixels; i += 4) {
             imageData.data[i] = outputData[i];
-            imageData.data[i+1] = outputData[i+1];
-            imageData.data[i+2] = outputData[i+2];
-            imageData.data[i+3] = 255;
+            imageData.data[i + 1] = outputData[i + 1];
+            imageData.data[i + 2] = outputData[i + 2];
+            imageData.data[i + 3] = 255;
         }
 
         outputContext.putImageData(imageData, 0, 0);
-    } catch(e) {
+    } catch (e) {
         console.error("Error on SobelCL = " + e.message);
         throw e;
     }
