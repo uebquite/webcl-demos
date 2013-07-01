@@ -278,6 +278,25 @@ window.WebCLCommon = (function (debug) {
          */
         setDebugOff : function () {
             debug = false;
+        },
+
+        /**
+         * Load the kernel file and return its content
+         *
+         * @param {String} filePath - Kernel file (*.cl) path
+         * @returns {String} File content
+         */
+        loadKernel : function (filePath) {
+            var res = null;
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", filePath, false);
+            xhr.send();
+            // HTTP reports success with a 200 status, file protocol reports
+            // success with a 0 status
+            if (xhr.status === 200 || xhr.status === 0) {
+                res = xhr.responseText;
+            }
+            return res;
         }
     };
 
