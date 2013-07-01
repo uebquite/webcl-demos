@@ -32,8 +32,8 @@ body {
 
 <script type="text/javascript" src="../common/webcl.js"></script>
 <script type="text/javascript" src="sampler.js"></script>
-<script type="text/javascript" src="J3DI.js"> </script>
-<script type="text/javascript" src="J3DIMath.js"> </script>
+<script type="text/javascript" src="../common/J3DI.js"> </script>
+<script type="text/javascript" src="../common/J3DIMath.js"> </script>
 <script type="text/javascript" src="sobelJS.js"> </script>
 <script type="text/javascript" src="sobelCL.js"> </script>
 
@@ -95,7 +95,7 @@ body {
         int c = (x*4) + (y * width * 4);
         int k;
 
-        /* Read each texel component and calculate the filtered 
+        /* Read each texel component and calculate the filtered
         value using neighbouring texel components */
         if (x >= 1 && x < (width - 1) && y >= 1 && y < height - 1) {
             float i00[4];
@@ -164,6 +164,67 @@ body {
         this.currentAngle    = 0;           // for rotating video cube
     }
     var userData = new UserData();
+
+    /* Overwrite J3DI::initWebGL */
+    function initWebGL(canvasName, vshader, fshader, attribs, clearColor, clearDepth) {
+        var canvas = document.getElementById(canvasName);
+        var gl = canvas.getContext("experimental-webgl");
+        if (!gl) {
+            alert("No WebGL context found");
+            return null;
+        }
+
+        // create our shaders
+        var vertexShader = loadShader(gl, vshader);
+        var fragmentShader = loadShader(gl, fshader);
+
+        if (!vertexShader || !fragmentShader) {
+            return null;
+        }
+
+        // Create the program object
+        gl.program = gl.createProgram();
+
+        if (!gl.program) {
+            return null;
+        }
+
+        // Attach our two shaders to the program
+        gl.attachShader (gl.program, vertexShader);
+        gl.attachShader (gl.program, fragmentShader);
+
+        // Bind attributes
+        for (var i in attribs)
+            gl.bindAttribLocation (gl.program, i, attribs[i]);
+
+        // Link the program
+        gl.linkProgram(gl.program);
+
+        // Check the link status
+        var linked = gl.getProgramParameter(gl.program, gl.LINK_STATUS);
+        if (!linked) {
+            // something went wrong with the link
+            var error = gl.getProgramInfoLog (gl.program);
+            gl.console.log("Error in program linking:"+error);
+
+            gl.deleteProgram(gl.program);
+            gl.deleteProgram(fragmentShader);
+            gl.deleteProgram(vertexShader);
+
+            return null;
+        }
+
+        gl.useProgram(gl.program);
+
+        gl.clearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
+        gl.clearDepth(clearDepth);
+
+        gl.enable(gl.DEPTH_TEST);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+        return gl;
+    }
 
     function initGL() {
         // Initialize
