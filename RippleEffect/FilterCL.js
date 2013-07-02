@@ -35,7 +35,7 @@ function initCL() {
 
         // Create the compute program from the source buffer
         //
-        kernelSource = getKernel("ripple.cl");
+        kernelSource = WebCLCommon.loadKernel("ripple.cl");
         if (kernelSource === null) {
             console.error("No kernel named: " + "Ripple_kernel");
             return false;
