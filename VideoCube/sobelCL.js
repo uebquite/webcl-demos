@@ -1,13 +1,3 @@
-function getKernel(id) {
-    var kernelScript = document.getElementById(id);
-    if (kernelScript === null || kernelScript.type !== "x-kernel") {
-        return null;
-    }
-
-    return kernelScript.firstChild.textContent;
-}
-
-
 var err;                                    // error code returned from API calls
 
 var blockSizeX;
@@ -37,11 +27,11 @@ function initCL(useGpu) {
 
         // Create the compute program from the source buffer
         //
-        var kernelSource = getKernel("sobel_filter");
+        var kernelSource = WebCLCommon.loadKernel("kernel.cl");
         var deviceType = useGpu ? "GPU" : "CPU";
 
         if (kernelSource === null) {
-            console.error("No kernel named: " + "sobel_filter");
+            console.error("ERROR: could not load the kernel file.");
             return null;
         }
 
