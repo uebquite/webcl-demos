@@ -121,8 +121,12 @@ function webclfluid() {
 
     viewer = new Viewer(gl, shaderProgram, scalarField);
 
-    scalarSrc = getKernel("scalar_kernels.cl");
-    vectorSrc = getKernel("vector_kernels.cl");
+    scalarSrc = WebCLCommon.loadKernel("scalar_kernels.cl");
+    vectorSrc = WebCLCommon.loadKernel("vector_kernels.cl");
+    if (!scalarSrc || !vectorSrc) {
+        console.error("ERROR: could not load the kernel source file.");
+        return false;
+    }
 
     // Init empty scalar and vector fields used as source fields
     scalarAddField = new Float32Array(numCells);
@@ -516,18 +520,4 @@ function popMatrix(viewer) {
     if (matrixStack.length > 0) {
         viewer.mvMatrix = matrixStack.pop();
     }
-}
-
-function getKernel(src) {
-    var xhr = new XMLHttpRequest(), ret = null;
-    xhr.open("GET", src, false);
-    xhr.send(null);
-    if (xhr.status === 200 ||  //http protocol
-            xhr.status === 0) { //file protocol
-        ret = xhr.responseText;
-    } else {
-        console.log("XMLHttpRequest error!", xhr);
-    }
-    
-    return ret;
 }
