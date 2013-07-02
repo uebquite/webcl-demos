@@ -46,24 +46,10 @@ var running = true;
 
 var useGPU = true;
 
-function xhrLoad(uri) {
-    var xhr = new XMLHttpRequest();
-    xhr.open("GET", uri, false);
-    xhr.send();
-    // HTTP reports success with a 200 status, file protocol reports
-    // success with a 0 status
-    if (xhr.status === 200 || xhr.status === 0) {
-        return xhr.responseText;
-    }
-
-    return null;
-}
-
 requestAnimationFrame = window.requestAnimationFrame ||
                             window.mozRequestAnimationFrame ||
                             window.webkitRequestAnimationFrame ||
                             window.msRequestAnimationFrame;
-
 
 var start = window.mozAnimationStartTime;  // Only supported in FF. Other browsers can use something like Date.now(). 
 
@@ -465,7 +451,12 @@ function initWebCL() {
     }
 
     try {
-        clSrc = xhrLoad("rendering_kernel.cl");
+        clSrc = WebCLCommon.loadKernel("rendering_kernel.cl");
+        if (clSrc === null) {
+            console.log("No kernel named: RadianceGPU");
+            return;
+        }
+
         clProgram = cl.createProgram(clSrc);
         clProgram.build(selectedDevice);
     } catch (err) {
