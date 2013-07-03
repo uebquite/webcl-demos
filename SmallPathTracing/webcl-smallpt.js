@@ -53,8 +53,9 @@ requestAnimationFrame = window.requestAnimationFrame ||
 
 var start = window.mozAnimationStartTime;  // Only supported in FF. Other browsers can use something like Date.now(). 
 
-function toogleDevice(device) {
+function toggleDevice(device) {
     useGPU = (device === 'CPU') ? false : true;
+    reset();
     initWebCL();
 }
 
@@ -403,48 +404,17 @@ function allocateBuffers() {
     clQueue.enqueueWriteBuffer(seedBuffer, true, 0, bufSize, seeds);
 }
 
-function clDeviceQuery() {
-    var deviceList = [];
-    var platforms = (window.webcl && webcl.getPlatforms()) || [];
-    var p;
-    for (p = 0, i = 0; p < platforms.length; p++) {
-        var plat = platforms[p];
-        var devices = plat.getDevices(useGPU ? webcl.DEVICE_TYPE_GPU : webcl.DEVICE_TYPE_CPU);
-        var d;
-        for (d = 0; d < devices.length; d++, i++) {
-            if (devices[d].getInfo(webcl.DEVICE_AVAILABLE) === true) {
-                var availableDevice = { 'device' : devices[d],
-                        'type' : devices[d].getInfo(webcl.DEVICE_TYPE),
-                        'platform' : plat };
-                deviceList.push(availableDevice);
-            }
-        }
-    }
-
-    return deviceList;
-}
-
 function initWebCL() {
 
-    var deviceList = clDeviceQuery();
-
-    if (deviceList.length === 0) {
-        alert("Unfortunately your browser/system doesn't support WebCL.");
-        return false;
-    }
+    var deviceType = useGPU ? "GPU" : "CPU";
 
     try {
-        var selectedDevice = deviceList[selected].device;
-        var selectedPlatform = deviceList[selected].platform;
-        var deviceType = deviceList[selected].type;
+        WebCLCommon.init(deviceType);
+        cl = WebCLCommon.createContext();
+        clQueue = cl.createCommandQueue();
 
-        var contextProperties = {platform: selectedPlatform,
-                                    devices: [selectedDevice],
-                                    deviceType: deviceType, shareGroup: 0,
-                                    hint: null};
+        var devices = WebCLCommon.getDevices(deviceType);
 
-        cl = webcl.createContext(contextProperties);
-        clQueue = cl.createCommandQueue(selectedDevice, null);
         allocateBuffers();
     } catch (e) {
         alert("Error initializing WebCL : " + e.message);
@@ -457,18 +427,17 @@ function initWebCL() {
             return;
         }
 
-        clProgram = cl.createProgram(clSrc);
-        clProgram.build(selectedDevice);
-    } catch (err) {
+        clProgram = WebCLCommon.createProgramBuild(clSrc);
+    } catch (e) {
         alert("Failed to build webcl program. Error " +
-            clProgram.getBuildInfo(selectedDevice, webcl.PROGRAM_BUILD_STATUS) +
-            ":  " + clProgram.getBuildInfo(selectedDevice, webcl.PROGRAM_BUILD_LOG));
-        throw err;
+            clProgram.getBuildInfo(devices[0], webcl.PROGRAM_BUILD_STATUS) +
+            ":  " + clProgram.getBuildInfo(devices[0], webcl.PROGRAM_BUILD_LOG));
+        throw e;
     }
 
     clKernel = clProgram.createKernel("RadianceGPU");
 
-    wgSize = clKernel.getWorkGroupInfo(selectedDevice, webcl.KERNEL_WORK_GROUP_SIZE);
+    wgSize = clKernel.getWorkGroupInfo(devices[0], webcl.KERNEL_WORK_GROUP_SIZE);
 }
 
 function executeKernel() {

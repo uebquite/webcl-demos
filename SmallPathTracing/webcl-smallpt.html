@@ -30,8 +30,8 @@
                 <div>
                   <button type="button" onclick="reset();">Reset</button>
                   <button type="button" id="stop" onclick="stop();">Stop</button>
-                  GPU<input type="radio" name="device" id="GPUradio" onclick="toogleDevice('GPU');" checked="true">
-                  CPU<input type="radio" name="device" id="CPUradio" onclick="toogleDevice('CPU');">
+                  GPU<input type="radio" name="device" id="GPUradio" onclick="toggleDevice('GPU');" checked="true">
+                  CPU<input type="radio" name="device" id="CPUradio" onclick="toggleDevice('CPU');">
                 </div>
                 <p>Canvas resolution:</p>
                 <select id="resolution" onchange="resolutionChanged(this.selectedIndex);">
