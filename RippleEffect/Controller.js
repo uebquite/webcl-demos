@@ -20,18 +20,6 @@ var cy = 0;
 var diag = 0;
 var touchDown = false;
 
-window.requestAnimFrame = (function () {
-    return window.requestAnimationFrame    ||
-        window.webkitRequestAnimationFrame ||
-        window.mozRequestAnimationFrame    ||
-        window.oRequestAnimationFrame      ||
-        window.msRequestAnimationFrame     ||
-        function (callback, element) {
-            window.setTimeout(callback, 1000 / 60);
-        };
-}());
-
-
 function init() {
     // Start load of an image from a file
     //

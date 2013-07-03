@@ -1,14 +1,5 @@
 //Based on: http://www.ibiblio.org/e-notes/webcl/cl_gl.js
 
-requestAnimationFrame = (function() {
-  return window.webkitRequestAnimationFrame ||
-  window.mozRequestAnimationFrame ||
-  function(callback, element) {
-    window.setTimeout( callback, 1000 / 60 );
-  };
-
-})();
-
 // The linearFiltering parameter indicates which type of filtering will be used in WebGL.
 // If true, gl.LINEAR filter will be used, if false gl.NEAREST will be used.
 

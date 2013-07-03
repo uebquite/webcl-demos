@@ -8,6 +8,7 @@
 <script src="CanvasMatrix.js" type="text/javascript"></script>
 <script src="xy3d_gl.js" type="text/javascript"></script>
 <script src="../common/webcl.js" type="text/javascript"></script>
+<script src="../common/webgl-utils.js" type="text/javascript"></script>
 
 <script id="shader-vs" type="x-shader/x-vertex">
   const float n = 64.;
@@ -130,7 +131,7 @@ function step() {
 
 function doAnim() {
     if (delay === 0) {
-        requestAnimationFrame(anim);
+        requestAnimFrame(anim);
     } else {
         setTimeout("requestAnimFrame(anim)", delay);
     }

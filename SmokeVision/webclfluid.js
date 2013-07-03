@@ -86,9 +86,6 @@ var ds = 1.0;
 
 var running = false;
 
-requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame ||
-    window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
-
 //var start = window.mozAnimationStartTime;  // Only supported in FF. Other browsers can use something like Date.now().
 var start = Date.now();
 
@@ -160,7 +157,7 @@ function webclfluid() {
 
     running = true;
     prevTime = Date.now();
-    requestAnimationFrame(step, canvas);
+    requestAnimFrame(step, canvas);
 }
 
 function mouse_move(e) {
@@ -247,7 +244,7 @@ function step() {
         vectorField.step(vectorAddField);
         viewer.draw();
 
-        requestAnimationFrame(step, canvas);
+        requestAnimFrame(step, canvas);
     }
 }
 
@@ -358,7 +355,7 @@ function stop() {
         document.getElementById("stop").innerHTML = "Start";
     } else {
         running = true;
-        requestAnimationFrame(step, canvas);
+        requestAnimFrame(step, canvas);
         document.getElementById("stop").innerHTML = "Stop";
     }
 }

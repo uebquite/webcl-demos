@@ -46,11 +46,6 @@ var running = true;
 
 var useGPU = true;
 
-requestAnimationFrame = window.requestAnimationFrame ||
-                            window.mozRequestAnimationFrame ||
-                            window.webkitRequestAnimationFrame ||
-                            window.msRequestAnimationFrame;
-
 var start = window.mozAnimationStartTime;  // Only supported in FF. Other browsers can use something like Date.now(). 
 
 function toggleDevice(device) {
@@ -67,7 +62,7 @@ function initPathTracing() {
     updateRendering();
     running = true;
     prevTime = Date.now();
-    requestAnimationFrame(step, canvas);
+    requestAnimFrame(step, canvas);
 }
 
 function step(timestamp) {
@@ -79,7 +74,7 @@ function step(timestamp) {
         jsTime = 0;
         clMemTime = 0;
         updateRendering();
-        requestAnimationFrame(step, canvas);
+        requestAnimFrame(step, canvas);
     }
 }
 
@@ -147,7 +142,7 @@ function stop() {
         document.getElementById("stop").innerHTML = "Start";
     } else {
         running = true;
-        requestAnimationFrame(step, canvas);
+        requestAnimFrame(step, canvas);
         document.getElementById("stop").innerHTML = "Stop";
     }
 }

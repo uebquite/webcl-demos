@@ -4,6 +4,7 @@
 <title>2d ink droplet. Buffers</title>
 
 <script src="../common/gl.js" type="text/javascript"></script>
+<script src="../common/webgl-utils.js" type="text/javascript"></script>
 <script src="../common/webcl.js" type="text/javascript"></script>
 
 <script type="text/javascript">
@@ -184,9 +185,9 @@ function anim() {
         animation = "animate";
     case "animate":
         if (delay === 0) {
-            requestAnimationFrame(anim);
+            requestAnimFrame(anim);
         } else {
-            setTimeout("requestAnimationFrame(anim)", delay);
+            setTimeout("requestAnimFrame(anim)", delay);
         }
         break;
     case "stop":

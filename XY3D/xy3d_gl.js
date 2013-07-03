@@ -28,14 +28,6 @@ function getShader(gl, id) {
     return shader;
 }
 
-requestAnimFrame = (function () {
-    return window.webkitRequestAnimationFrame ||
-        window.mozRequestAnimationFrame ||
-        function (callback, element) {
-            window.setTimeout(callback, 1000 / 60);
-        };
-})();
-
 var gl, canvas, c_w, c_h, prog, tex_gl, mvMat, mvMatLoc, rotMat,
     transl = -2, xOffs = 0, yOffs = 0, drag = 0, xRot = 0, yRot = 0;
 

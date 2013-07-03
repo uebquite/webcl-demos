@@ -5,6 +5,7 @@
 <title>XY model. Modified chess-board algorithm</title>
 
 <script src="../common/gl.js" type="text/javascript"></script>
+<script src="../common/webgl-utils.js" type="text/javascript"></script>
 <script src="../common/webcl.js" type="text/javascript"></script>
 
 <script type="text/javascript">
@@ -96,7 +97,7 @@ function draw() {
 
 function doAnim() {
     if (delay === 0) {
-        requestAnimationFrame(anim);
+        requestAnimFrame(anim);
     } else {
         setTimeout("requestAnimFrame(anim)", delay);
     }
