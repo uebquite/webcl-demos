@@ -39,7 +39,7 @@ function mandelbrotCL() {
         WebCLCommon.init(useGPU ? "GPU" : "CPU");
 
         var ctx = WebCLCommon.createContext();
-        var program = WebCLCommon.createProgramBuild(kernelSrc);
+        program = WebCLCommon.createProgramBuild(kernelSrc);
         cmdQueue = WebCLCommon.createCommandQueue();
 
         bufCol = ctx.createBuffer(webcl.MEM_WRITE_ONLY, bufSize);
