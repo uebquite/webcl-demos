@@ -9,7 +9,6 @@
     font-weight: bold;
     font-size: 14px;
     color: white;
-    text-align: right;
 }
 .button {
    border-top: 1px solid #96d1f8;
@@ -366,7 +365,7 @@ void AESEncrypt(__global  uchar4  * output  ,
     unsigned int ndRangeSizey = get_global_size(1);
 
     unsigned int globalIndex = globalIdx * ndRangeSizey + globalIdy;
-    globalIndex *= 16;
+    globalIndex *= 4;
 
     int i;
     uchar4 state[4];
@@ -410,10 +409,10 @@ void AESEncrypt(__global  uchar4  * output  ,
     //3. addRoundKey
     addRoundKey(state, roundKey, i);
 
-    output[0] = state[0];
-    output[1] = state[1];
-    output[2] = state[2];
-    output[3] = state[3];
+    output[globalIndex    ] = state[0];
+    output[globalIndex + 1] = state[1];
+    output[globalIndex + 2] = state[2];
+    output[globalIndex + 3] = state[3];
 }
 
 __kernel
@@ -470,7 +469,7 @@ void AESDecrypt(__global  uchar4  * output    ,
 
     unsigned int globalIndex = globalIdy * ndRangeSizex + globalIdx;
 
-    globalIndex *= 16;
+    globalIndex *= 4;
 
     int i;
     uchar4 state[4];
@@ -509,16 +508,16 @@ void AESDecrypt(__global  uchar4  * output    ,
     //3. addRoundKey
     addRoundKey(state, roundKey, 0);
 
-    output[0] = state[0];
-    output[1] = state[1];
-    output[2] = state[2];
-    output[3] = state[3];
+    output[globalIndex    ] = state[0];
+    output[globalIndex + 1] = state[1];
+    output[globalIndex + 2] = state[2];
+    output[globalIndex + 3] = state[3];
 }
 </script>
 
 <script src="aes.js"></script>
 <script>
-function showResults(tStart, tEnd) {
+function showResults(tStart, tEnd, title, resultText) {
     var delta;
     var bps;
     var mbps;
@@ -532,24 +531,66 @@ function showResults(tStart, tEnd) {
     document.getElementById("bps").firstChild.nodeValue = mbps + " MB/sec";
     document.getElementById("res").style.visibility = "visible";
     document.getElementById("bps").style.visibility = "visible";
+
+    var node = document.createTextNode(title);
+    document.getElementById("title").innerHTML = title;
+    document.getElementById("result").value = resultText;
+    document.getElementById("resultsDiv").style.visibility = "visible";
 }
 
 function hideResults() {
     document.getElementById("res").style.visibility = "hidden";
     document.getElementById("bps").style.visibility = "hidden";
 }
+
+function unchecked(id) {
+    document.getElementById(id).checked = false;
+}
 </script>
 
 </head>
 
 <body onload="init()" bgcolor="black">
-<div style="position:absolute; left:0px; top:0px">
-<div id="enc" class="button" onclick="EncryptCL(10)" style="position:absolute; left:  5px; top:5px; width:50px; height:20px">Encrypt</div>
-<div id="dec" class="button" onclick="DecryptCL(10)" style="position:absolute; left: 85px; top:5px; width:50px; height:20px">Decrypt</div>
+<div id="container" style="left:5px; top:5px; width:800px; height:600px;">
 
-<div id="res" class="info" style="position:absolute; left:10px; top:40px; width:40px;">Results:</div>
-<div id="bps" class="info" style="position:absolute; left:60px; top:40px; width:260px;">XX</div>
+    <!-- input text -->
+    <div style="width:100%; float:left;">
+        <textarea id="inputText" style="top:5px; float:left;" cols="85" rows="5"></textarea>
+    </div>
+    <div style="width:100%;">
+        <textarea id="inputKey" style="top:5px; float:left;" cols="40" rows="1"></textarea>
+        <form style="margin-top:5px; color:white; float:left;" action="">
+            <input type="radio" id="plainText" checked="true" onclick="unchecked('hex')">Plain Text
+            <input type="radio" id="hex" onclick="unchecked('plainText')">Hexadecimal
+        </form>
+        <select style="margin-top:5px; margin-left:5px;" onchange="readTest(this.value)">
+            <option value="0" selected="selected">Choose a Test</option>
+            <option value="1">Test I</option>
+            <option value="2">Test II</option>
+            <option value="3">Test III</option>
+            <option value="4">Test IV</option>
+            <option value="5">Test V</option>
+        </select>
+    </div>
 
+    <!-- buttons -->
+    <div style="margin-top:5px; width:100%; float:left;">
+        <div id="enc" class="button" onclick="encryptCL()" style="float:left; margin-right:10px;">Encrypt</div>
+        <div id="dec" class="button" onclick="decryptCL()" style="float:left;">Decrypt</div>
+    </div>
+
+    <!-- compute seconds -->
+    <div style="float:left; margin-top: 10px; width:100%">
+        <div id="res" class="info" style="float:left;">Results:</div>
+        <div id="bps" class="info" style="float:left; margin-left:5px">XX</div>
+    </div>
+
+    <!-- show result text -->
+    <div id="resultsDiv" style="margin-top:10px; float:left; visibility:hidden;">
+        <p id="title" style="color:white;"></p>
+        <textarea id="result" readonly cols="40" rows="5"></textarea>
+    </div>
 </div>
+
 </body>
 </html>
