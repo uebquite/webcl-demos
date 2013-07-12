@@ -515,14 +515,43 @@ void AESDecrypt(__global  uchar4  * output    ,
 }
 </script>
 
-<script src="aes.js"></script>
 <script>
+
+var NBYTES = Math.pow(2,20);
+
+function init() {
+    initCL();
+    initJS();
+}
+
+function encrypt(opt) {
+    var enc;
+
+    if (opt == 1) {
+        encryptCL();
+    }
+    else {
+        encryptJSInit();
+    }
+}
+
+function decrypt(opt) {
+    var dec;
+
+    if (opt == 1) {
+        decryptCL();
+    }
+    else {
+        decryptJSInit();
+    }
+}
+
 function showResults(tStart, tEnd, title, resultText) {
     var delta;
     var bps;
     var mbps;
 
-    console.log("delta: " + (tEnd - tStart) + " msec");
+    console.log(title + " Done! delta: " + (tEnd - tStart) + " msec");
 
     delta = Math.max(1, tEnd - tStart);                             // msec
     bps = 1000 * NINTS * Int32Array.BYTES_PER_ELEMENT / delta;      // bytes / sec
@@ -546,7 +575,11 @@ function hideResults() {
 function unchecked(id) {
     document.getElementById(id).checked = false;
 }
+
 </script>
+
+<script src="aesCL.js"></script>
+<script src="aesJS.js"></script>
 
 </head>
 
@@ -575,8 +608,12 @@ function unchecked(id) {
 
     <!-- buttons -->
     <div style="margin-top:5px; width:100%; float:left;">
-        <div id="enc" class="button" onclick="encryptCL()" style="float:left; margin-right:10px;">Encrypt</div>
-        <div id="dec" class="button" onclick="decryptCL()" style="float:left;">Decrypt</div>
+        <div id="enc" class="button" onclick="encrypt(1)" style="float:left; margin-right:10px;">EncryptCL</div>
+        <div id="dec" class="button" onclick="decrypt(1)" style="float:left;">DecryptCL</div>
+    </div>
+    <div style="margin-top:5px; width:100%; float:left;">
+        <div id="enc" class="button" onclick="encrypt(0)" style="float:left; margin-right:10px;">EncryptJS</div>
+        <div id="dec" class="button" onclick="decrypt(0)" style="float:left;">DecryptJS</div>
     </div>
 
     <!-- compute seconds -->

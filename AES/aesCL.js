@@ -1,7 +1,7 @@
 var DATA_SIZE = 1024;
 
 var err;                                    // error code returned from API calls
-var NINTS       = Math.pow(2,25);
+var NINTS       = NBYTES;
 
 var text        = "1234567890123456";
 var textUint;
@@ -215,7 +215,8 @@ function onEncryptComplete() {
 
     // uncomment this to write in output
     //showResults(tStart, tEnd, "Encrypt Text", strResult);
-    showResults(tStart, tEnd, "Encrypt Text", "");
+    showResults(tStart, tEnd, "Encryption CL", "");
+
     realText = textUint;
     textUint = encData;
 }
@@ -311,7 +312,7 @@ function onDecryptComplete() {
 
     // uncomment this to write in output
     //showResults(tStart, tEnd, "Decrypt Text", strResult);
-    showResults(tStart, tEnd, "Decrypt Text", "");
+    showResults(tStart, tEnd, "Decryption CL", "");
 }
 
 // get kernel source
@@ -323,7 +324,7 @@ function getKernel(id) {
     return kernelScript.firstChild.textContent;
 }
 
-function initCL() {
+function initCLSettings() {
     var gpu = false;
     var contextProperties;
     var kernelSource;
@@ -401,7 +402,7 @@ function getBytes(num) {
     return bytes;
 }
 
-function initVars() {
+function initCLVars() {
     var tmp;
     var len;
     var i;
@@ -418,7 +419,7 @@ function initVars() {
     }
 }
 
-function init() {
-    initVars();
-    initCL();
+function initCL() {
+    initCLVars();
+    initCLSettings();
 }
