@@ -150,6 +150,10 @@ function stop() {
 function resolutionChanged(resolution) {
     running = false;
 
+    if (!canvas) {
+        return;
+    }
+
     if (resolution === 0) {
         canvas.width = 320;
         canvas.height = 240;

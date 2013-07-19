@@ -27,31 +27,32 @@
             <header>
                 <h1>WebCL SmallptGPU</h1>
             </header>
-                <canvas id="canvas" width="640" height="480" style="position:relative; left:0px; width:50%;"></canvas>
-                <div>
-                  <button type="button" onclick="reset();">Reset</button>
-                  <button type="button" id="stop" onclick="stop();">Stop</button>
-                  GPU<input type="radio" name="device" id="GPUradio" onclick="toggleDevice('GPU');" checked="true">
-                  CPU<input type="radio" name="device" id="CPUradio" onclick="toggleDevice('CPU');">
+                <div style="width:60%; float:left;">
+                    <canvas id="canvas" width="320" height="240"></canvas>
                 </div>
-                <p>Canvas resolution:</p>
-                <select id="resolution" onchange="resolutionChanged(this.selectedIndex);">
-                <option>320x240</option>
-                <option selected="selected">640x480</option>
-                <option>800x600</option>
-                </select>
-                <p>"Console":</p>
-                <div id="console"></div>
-                <h2>Help</h2>
-                Arrow Keys - rotate camera left/right/up/down<br>
-                a and d - move camera left and right<br>
-                w and s - move camera forward and backward<br>
-                r and f - move camera up and down<br>
-                PageUp and PageDown - move camera target up and down<br>
-                + and - - to select next/previous object<br>
-                2, 3, 4, 5, 6, 8, 9 - to move selected object<br>
-            <footer>
-            </footer>
+                <div style="width:40%; float:right;">
+                    <button type="button" onclick="reset();">Reset</button>
+                    <button type="button" id="stop" onclick="stop();">Stop</button>
+                    GPU<input type="radio" name="device" id="GPUradio" onclick="toggleDevice('GPU');" checked="true">
+                    CPU<input type="radio" name="device" id="CPUradio" onclick="toggleDevice('CPU');">
+                    <p>Canvas resolution:</p>
+                    <select id="resolution" onchange="resolutionChanged(this.selectedIndex);">
+                        <option selected="selected">320x240</option>
+                        <option>640x480</option>
+                        <option>800x600</option>
+                    </select>
+                    <p>"Console":</p>
+                    <div id="console"></div>
+                    <h3>Help</h3>
+                    Arrow Keys - rotate camera left/right/up/down<br>
+                    a and d - move camera left and right<br>
+                    w and s - move camera forward and backward<br>
+                    r and f - move camera up and down<br>
+                    PageUp and PageDown - move camera target up and down<br>
+                    + and - - to select next/previous object<br>
+                    2, 3, 4, 5, 6, 8, 9 - to move selected object<br>
+                </div>
+            <footer></footer>
         </div>
     </body>
 </html>
