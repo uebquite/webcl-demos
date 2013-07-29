@@ -95,22 +95,28 @@ function initImageSpin() {
 }
 
 var globalWorkSize = new Int32Array([n, n]);
+var localWorkSize = new Int32Array(2);
+
 function draw() {
     var i;
+
+    localWorkSize[0] = 8;
+    localWorkSize[1] = useGPU ? 8 : 1;
+
     for (i = 0; i < it;  i++) {
         kSpin.setArg(0, iSpin);
         kSpin.setArg(2, iSpin1);
         kSpin.setArg(3, 0, types.INT);
-        cmdQueue.enqueueNDRangeKernel(kSpin, 0, globalWorkSize, null);
+        cmdQueue.enqueueNDRangeKernel(kSpin, 0, globalWorkSize, localWorkSize);
         cmdQueue.flush();
 
         kSpin.setArg(0, iSpin1);
         kSpin.setArg(2, iSpin);
         kSpin.setArg(3, 1, types.INT);
-        cmdQueue.enqueueNDRangeKernel(kSpin, 0, globalWorkSize, null);
+        cmdQueue.enqueueNDRangeKernel(kSpin, 0, globalWorkSize, localWorkSize);
         cmdQueue.flush();
     }
-    cmdQueue.enqueueNDRangeKernel(kPix, 0, globalWorkSize, null);
+    cmdQueue.enqueueNDRangeKernel(kPix, 0, globalWorkSize, localWorkSize);
     cmdQueue.enqueueReadBuffer(bufPix, true, 0, bufSize, outBuffer);
     cmdQueue.finish();
     draw_gl(n, n, outBuffer);

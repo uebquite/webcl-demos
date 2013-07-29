@@ -88,13 +88,17 @@ function mandelbrotCL() {
 }
 
 function draw() {
+    var localWorkSize = new Int32Array(2);
+    localWorkSize[0] = 8;
+    localWorkSize[1] = useGPU ? 8 : 1;
+
     scale /= zoom;
     dR /= zoom2;
     dI /= zoom2;
     kernel.setArg(1, scale, WebCLKernelArgumentTypes.FLOAT);
     kernel.setArg(2, Ro + dR, WebCLKernelArgumentTypes.FLOAT);
     kernel.setArg(3, Io + dI, WebCLKernelArgumentTypes.FLOAT);
-    cmdQueue.enqueueNDRangeKernel(kernel, null, globalWS, null);
+    cmdQueue.enqueueNDRangeKernel(kernel, null, globalWS, localWorkSize);
     cmdQueue.enqueueReadBuffer(bufCol, true, 0, bufSize, outBuffer);
     cmdQueue.finish();
     draw_gl(nx, ny, outBuffer);

@@ -101,8 +101,12 @@ function draw() {
     kAdvec.setArg(2, U1);
     kAdvec.setArg(3, D1);
     var globalWorkSize = new Int32Array([n, n]);
+    var localWorkSize = new Int32Array(2);
 
-    var ev = cmdQueue.enqueueNDRangeKernel(kAdvec, [], globalWorkSize, null);
+    localWorkSize[0] = 8;
+    localWorkSize[1] = useGpu ? 8 : 1;
+
+    var ev = cmdQueue.enqueueNDRangeKernel(kAdvec, [], globalWorkSize, localWorkSize);
     cmdQueue.flush();
     var tmp, j;
     tmp = D;
@@ -115,20 +119,20 @@ function draw() {
     kForce.setArg(0, U);
     kForce.setArg(1, D);
     kForce.setArg(2, U1);
-    ev = cmdQueue.enqueueNDRangeKernel(kForce, [], globalWorkSize, null);
+    ev = cmdQueue.enqueueNDRangeKernel(kForce, [], globalWorkSize, localWorkSize);
     cmdQueue.flush();
     tmp = U;
     U = U1;
     U1 = tmp;
 
     kG.setArg(0, U);
-    ev = cmdQueue.enqueueNDRangeKernel(kG, [], globalWorkSize, null);
+    ev = cmdQueue.enqueueNDRangeKernel(kG, [], globalWorkSize, localWorkSize);
     cmdQueue.flush();
 
     for (j = 0; j < it; j++) {
         kP.setArg(0, P);
         kP.setArg(2, P1);
-        ev = cmdQueue.enqueueNDRangeKernel(kP, [], globalWorkSize, null);
+        ev = cmdQueue.enqueueNDRangeKernel(kP, [], globalWorkSize, localWorkSize);
         cmdQueue.flush();
         tmp = P;
         P = P1;
@@ -138,14 +142,14 @@ function draw() {
     kDiv.setArg(0, U);
     kDiv.setArg(1, P);
     kDiv.setArg(2, U1);
-    ev = cmdQueue.enqueueNDRangeKernel(kDiv, [], globalWorkSize, null);
+    ev = cmdQueue.enqueueNDRangeKernel(kDiv, [], globalWorkSize, localWorkSize);
     cmdQueue.flush();
     tmp = U;
     U = U1;
     U1 = tmp;
 
     kShow.setArg(0, D);
-    cmdQueue.enqueueNDRangeKernel(kShow, [], globalWorkSize, null);
+    cmdQueue.enqueueNDRangeKernel(kShow, [], globalWorkSize, localWorkSize);
     cmdQueue.finish();
     cmdQueue.enqueueReadBuffer(bufPix, true, 0, bufferSize, outPix);
     draw_gl(n, n, outPix);

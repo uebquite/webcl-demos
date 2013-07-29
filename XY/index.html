@@ -47,6 +47,9 @@ function initImageSpin() {
 
 function draw() {
     var i;
+    var SPIN_LOCAL_SIZE = new Int32Array(2);
+    SPIN_LOCAL_SIZE[0] = 8;
+    SPIN_LOCAL_SIZE[1] = useGPU ? 8 : 1;
 
     for (i = 0; i < it; i++) {
         kSpinW.setArg(0, iSpinB);
@@ -54,7 +57,7 @@ function draw() {
         kSpinW.setArg(2, iSpinW1);
 
         try {
-            cmdQueue.enqueueNDRangeKernel(kSpinW, null, SPIN_GLOBAL_SIZE, null);
+            cmdQueue.enqueueNDRangeKernel(kSpinW, null, SPIN_GLOBAL_SIZE, SPIN_LOCAL_SIZE);
         } catch (e) {
             console.error(e);
             throw e;
@@ -70,7 +73,7 @@ function draw() {
         kSpinB.setArg(1, iSpinW);
         kSpinB.setArg(2, iSpinB1);
 
-        cmdQueue.enqueueNDRangeKernel(kSpinB, null, SPIN_GLOBAL_SIZE, null);
+        cmdQueue.enqueueNDRangeKernel(kSpinB, null, SPIN_GLOBAL_SIZE, SPIN_LOCAL_SIZE);
         cmdQueue.flush();
 
         /* Swap images */
@@ -82,7 +85,7 @@ function draw() {
     kPix.setArg(0, iSpinB);
     kPix.setArg(1, iSpinW);
 
-    cmdQueue.enqueueNDRangeKernel(kPix, null, PIX_GLOBAL_SIZE, null);
+    cmdQueue.enqueueNDRangeKernel(kPix, null, PIX_GLOBAL_SIZE, SPIN_LOCAL_SIZE);
     cmdQueue.enqueueReadBuffer(bufPix, true, 0, bufSize, outBuffer);
     cmdQueue.finish();
 
