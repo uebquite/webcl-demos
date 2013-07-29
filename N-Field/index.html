@@ -1,0 +1,284 @@
+<html>
+<head>
+
+<!-- Based on: http://www.ibiblio.org/e-notes/webcl/mc/n-field.html -->
+
+<title>n-field model</title>
+
+<script src="../common/gl.js" type="text/javascript"></script>
+<script src="../common/webgl-utils.js" type="text/javascript"></script>
+<script src="../common/webcl.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+
+var T         = 0.01;
+var n         = 512;
+var it        = 100;
+var delay     = 0;
+var bufSize   = 4 * n * n;
+var dataSize  = n * n;
+var frames    = 0;
+var time;
+var frTimer;
+var animation;
+var useGPU    = true;
+
+var cmdQueue;
+var bufPix;
+var bufRand;
+var iSpin;
+var iSpin1;
+var kSpin;
+var kPix;
+var outBuffer      = new Uint8Array(bufSize);
+var origin         = new Int32Array([0, 0, 0]);
+var region         = new Int32Array([n, n, 1]);
+var globalWorkSize = new Int32Array([n, n]);
+var localWorkSize;
+
+
+function runCL() {
+    var canvas;
+    var ctx;
+    var descriptor;
+    var i;
+    var kernelSrc;
+    var no;
+    var p;
+    var program;
+    var spin;
+    var UIrand;
+    var x;
+
+    UIrand = new Uint32Array(dataSize);
+    spin   = new Float32Array(bufSize);
+
+    if (useGPU) {
+        localWorkSize = new Int32Array([8, 8]);
+    } else {
+        localWorkSize = new Int32Array([8 * 8, 1]);
+    }
+
+    for (i = 0; i < dataSize;  i++) {
+        UIrand[i] = Math.floor(Math.random() * 4294967295);
+    }
+
+    for (i = p = 0; i < dataSize;  i++) {
+        x = Math.random() - 0.5;
+        y = Math.random() - 0.5;
+        z = Math.random() - 0.5;
+        no = Math.sqrt(x * x + y * y + z * z);
+        spin[p++] = x / no;
+        spin[p++] = y / no;
+        spin[p++] = z / no;
+        spin[p++] = 0;
+    }
+
+    kernelSrc = WebCLCommon.loadKernel("kernel.cl");
+    if (!kernelSrc) {
+        console.error("ERROR: could not load the kernel file.");
+        return;
+    }
+
+    try {
+        WebCLCommon.init(useGPU ? "GPU" : "CPU");
+        ctx = WebCLCommon.createContext();
+        program  = WebCLCommon.createProgramBuild(kernelSrc);
+        cmdQueue = WebCLCommon.createCommandQueue();
+
+        descriptor = {channelOrder: webcl.RGBA,
+                        channelType: webcl.FLOAT,
+                        width: n, height: n, rowPitch: 0};
+
+        bufRand = ctx.createBuffer(webcl.MEM_READ_WRITE, bufSize);
+        bufPix  = ctx.createBuffer(webcl.MEM_WRITE_ONLY, bufSize);
+        iSpin   = ctx.createImage(webcl.MEM_READ_WRITE, descriptor);
+        iSpin1  = ctx.createImage(webcl.MEM_READ_WRITE, descriptor);
+
+        cmdQueue.enqueueWriteBuffer(bufRand, true, 0, bufSize, UIrand);
+        cmdQueue.enqueueWriteImage(iSpin, true, origin, region, 0, spin);
+
+        kSpin = program.createKernel("kSpin");
+        kPix  = program.createKernel("kPix");
+
+        kSpin.setArg(1, bufRand);
+        kSpin.setArg(4, 1 / T, WebCLKernelArgumentTypes.FLOAT);
+
+        kPix.setArg(0, iSpin);
+        kPix.setArg(1, bufPix);
+    } catch (e) {
+        console.error(e);
+        throw e;
+    }
+
+    canvas = document.getElementById("c");
+    init_gl(canvas);
+    frTimer = setInterval(fr, 500);
+    time = new Date().getTime();
+    animation = "animate";
+    anim();
+}
+
+function draw() {
+    var i;
+    var kernelSize;
+
+    try {
+        for (i = 0; i < it;  i++) {
+            kSpin.setArg(0, iSpin);
+            kSpin.setArg(2, iSpin1);
+            kSpin.setArg(3, 0, WebCLKernelArgumentTypes.INT);
+
+            cmdQueue.enqueueNDRangeKernel(kSpin, null, globalWorkSize, localWorkSize);
+            cmdQueue.flush();
+
+            kSpin.setArg(0, iSpin1);
+            kSpin.setArg(2, iSpin);
+            kSpin.setArg(3, 1, WebCLKernelArgumentTypes.INT);
+
+            cmdQueue.enqueueNDRangeKernel(kSpin, null, globalWorkSize, localWorkSize);
+            cmdQueue.flush();
+        }
+        cmdQueue.enqueueNDRangeKernel(kPix, null, globalWorkSize, localWorkSize);
+        cmdQueue.enqueueReadBuffer(bufPix, true, 0, bufSize, outBuffer);
+    } catch (e) {
+        console.error(e.message);
+    }
+
+    draw_gl(n, n, outBuffer);
+    frames++;
+}
+
+function animate() {
+    if (delay === 0) {
+        requestAnimFrame(anim);
+    } else {
+        setTimeout("requestAnimFrame(anim)", delay);
+    }
+}
+
+function anim() {
+    var i;
+    var no;
+    var p;
+    var spin;
+    var x;
+
+    draw();
+    switch (animation) {
+    case "reset":
+        runCL();
+        animate();
+        break;
+
+    case "animate":
+        animate();
+        break;
+
+    case "stop":
+        break;
+    }
+}
+
+function run(v) {
+    if (animation === "animate") {
+        animation = "stop";
+        document.getElementById('runBtn').value = "Run ";
+    } else {
+        animation = "animate";
+        document.getElementById('runBtn').value = "Stop";
+        anim();
+    }
+}
+
+function reset() {
+    if (animation === "stop") {
+        animation = "reset";
+        document.getElementById('runBtn').value = "Stop";
+        anim();
+    } else {
+        animation = "reset";
+    }
+}
+
+function setDelay(val) {
+    delay = parseInt(val, 10);
+}
+
+function fr() {
+    var fps;
+    var ti;
+
+    ti = new Date().getTime();
+    fps = Math.round(1000 * frames / (ti - time));
+    document.getElementById("framerate").value = fps;
+    frames = 0;
+    time = ti;
+}
+
+function setT(v) {
+    var T;
+
+    T = v.valueOf();
+    kSpin.setlArg(4, 1 / T, WebCLKernelArgumentTypes.FLOAT);
+}
+
+function setIt(val) {
+    it = parseInt(val, 10);
+}
+
+function toogleDevice(device) {
+    window.clearInterval(frTimer);
+    useGPU = (device === 'CPU') ? false : true;
+    runCL();
+}
+
+</script>
+
+<style type="text/css">
+    h1 {
+        font-size: 120%;
+        color: green;
+    }
+    h2 {
+        font-size: 100%;
+        color: green;
+    }
+    pre {
+        color: darkblue;
+    }
+</style>
+
+</head>
+
+<body onload="runCL();">
+
+<h1>n-field model</h1>
+
+<p id="output"></p>
+<canvas id="c" width="512" height="512"></canvas>
+<br><button onclick="reset();">Reset</button>
+<input type="button" onclick="run();" value="Stop" size="1" id="runBtn">
+T<input size="4" value="0.01" type="text" onchange="setT(this.value);">
+It<input size="1" value="100" type="text" onchange="setIt(this.value);">
+delay<input size="2" value="0" type="text" onchange="setDelay(this.value);">
+fps<input size="2" type="text" id="framerate">
+GPU<input type="radio" name="device" id="GPUradio" onclick="toogleDevice('GPU');" checked="true">
+CPU<input type="radio" name="device" id="CPUradio" onclick="toogleDevice('CPU');">
+
+<br>GPU based Monte-Carlo simulation of the n-field model on the square 512&times;512 grid.
+<i>it</i> is the number of MC iterations per frame.
+The linear congruential random number generator is used.
+You can watch instantons formation from random spin configuration.
+<br>
+<br>Below different HUE colors are used for different spin phases <i>&phi;</i>
+(spin unit vector has coordinates <i><b>s</b> = (cos &phi; &middot;
+ sin &theta;, sin &phi; &middot; sin &theta;, cos &theta;)</i> ).
+"Top" spins (<i>&theta; = 0</i>) are white and "bottom" ones
+(<i>&theta; = &pi;</i>) are black.
+<br>
+<br>Instantons (topological solitons) are looked as color round defects
+in these pictures.
+
+</body>
+</html>
