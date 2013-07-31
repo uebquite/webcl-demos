@@ -193,6 +193,11 @@ function setIt(val) {
     it = parseInt(val, 10);
 }
 
+function toggleDevice(device) {
+    useGPU = (device === 'CPU') ? false : true;
+    ranCL();
+}
+
 </script>
 <style type="text/css">
   h1{ font-size: 120%; color: green; }
@@ -211,6 +216,8 @@ T<input type=text size="3" value="1" onchange="setT(this.value);">
 It<input type=text size="1" value="100" onchange="setIt(this.value);">
 delay<input type=text size="2" value="0" onchange="setDelay(this.value);">
 fps<input size="2" id="framerate">
+GPU<input type="radio" name="device" id="GPUradio" onclick="toggleDevice('GPU');" checked="true">
+CPU<input type="radio" name="device" id="CPUradio" onclick="toggleDevice('CPU');">
 
 <p>Monte-Carlo simulation of the Ising model on the square 512&times;512
 grid. <i>it</i> is the number of MC iterations per frame. The thermostat
