@@ -16,7 +16,7 @@ var ctx_c, n = 512, it = 100, bufSize = 4 * n * n, bufW, ev,
 var kSpin, kPix, cmdQueue, iSpin, iSpin1, bufRand, bufW,
     bufWSize = 4 * 5, bufPix, outBuffer;
 var types = WebCLKernelArgumentTypes;
-var useGPU = false;
+var useGPU = true;
 
 function randCL() {
     try {
@@ -34,7 +34,7 @@ function randCL() {
         bufRand = ctx.createBuffer(webcl.MEM_READ_WRITE, bufSize);
         bufW = ctx.createBuffer(webcl.MEM_READ_ONLY, bufWSize);
 
-        var descriptor = {channelOrder: webcl.RGBA, channelDataType: webcl.SIGNED_INT8,
+        var descriptor = {channelOrder: webcl.RGBA, channelType: webcl.SIGNED_INT8,
                         width: n, height: n, rowPitch: 0};
         iSpin  = ctx.createImage(webcl.MEM_READ_WRITE, descriptor);
         iSpin1 = ctx.createImage(webcl.MEM_READ_WRITE, descriptor);
@@ -80,7 +80,7 @@ function randCL() {
 
 function initImageSpin() {
     var size = n * n;
-    var spin = new Int8Array(size);
+    var spin = new Int32Array(size);
     var i;
     for (i = 0; i < size;  i++) {
         spin[i] = Math.floor(Math.random() * 1.999999);
@@ -88,10 +88,9 @@ function initImageSpin() {
 
     var origin = new Int32Array([0, 0, 0]);
     var region = new Int32Array([n, n, 1]);
-    var hostRowPitch = new Uint32Array([0]);
 
-    cmdQueue.enqueueWriteImage(iSpin, true, origin, region, hostRowPitch, spin);
-    cmdQueue.enqueueWriteImage(iSpin1, true, origin, region, hostRowPitch, spin);
+    cmdQueue.enqueueWriteImage(iSpin, true, origin, region, 0, spin);
+    cmdQueue.enqueueWriteImage(iSpin1, true, origin, region, 0, spin);
 }
 
 var globalWorkSize = new Int32Array([n, n]);
