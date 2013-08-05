@@ -12,7 +12,7 @@
 <script type="text/javascript">
 
 var ctx_c, n = 512, it = 100, bufSize = 4 * n * n, bufW, ev,
-    frames = 0, animation = "animate", time, delay = 0;
+    frames = 0, animation = "animate", time, delay = 0, frTimer;
 var kSpin, kPix, cmdQueue, iSpin, iSpin1, bufRand, bufW,
     bufWSize = 4 * 5, bufPix, outBuffer;
 var types = WebCLKernelArgumentTypes;
@@ -74,7 +74,7 @@ function randCL() {
     var canvas = document.getElementById("c");
     init_gl(canvas, false);
     time = new Date().getTime();
-    setInterval(fr, 500);
+    frTimer = setInterval(fr, 500);
     anim();
 }
 
@@ -194,8 +194,9 @@ function setIt(val) {
 }
 
 function toggleDevice(device) {
+    window.clearInterval(frTimer);
     useGPU = (device === 'CPU') ? false : true;
-    ranCL();
+    randCL();
 }
 
 </script>
