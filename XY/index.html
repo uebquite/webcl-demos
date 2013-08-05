@@ -18,6 +18,7 @@ var kSpinB, kSpinW, kPix, cmdQueue, iSpinB, iSpinB1, iSpinW, iSpinW1,
     bufPix, outBuffer, iTemp, spin, bufRand;
 
 var SPIN_GLOBAL_SIZE = new Int32Array([n, n2]);
+var SPIN_LOCAL_SIZE = new Int32Array(2);
 var PIX_GLOBAL_SIZE = new Int32Array([n, n]);
 var IMAGE_ORIGIN = new Int32Array([0, 0, 0]);
 var IMAGE_REGION = new Int32Array([n, n2, 1]);
@@ -47,9 +48,6 @@ function initImageSpin() {
 
 function draw() {
     var i;
-    var SPIN_LOCAL_SIZE = new Int32Array(2);
-    SPIN_LOCAL_SIZE[0] = 8;
-    SPIN_LOCAL_SIZE[1] = useGPU ? 8 : 1;
 
     for (i = 0; i < it; i++) {
         kSpinW.setArg(0, iSpinB);
@@ -144,6 +142,10 @@ function initWebCL() {
         }
 
         WebCLCommon.init(useGPU ? "GPU" : "CPU");
+
+        SPIN_LOCAL_SIZE[0] = 8;
+        SPIN_LOCAL_SIZE[1] = useGPU ? 8 : 1;
+
         var ctx = WebCLCommon.createContext();
         var program = WebCLCommon.createProgramBuild(kernelSrc);
         cmdQueue = WebCLCommon.createCommandQueue();

@@ -62,6 +62,8 @@ var kPath, kPix, kPixXY, kPixXT, kPixYT, cmdQueue, iPath, iPath1,
 var types = WebCLKernelArgumentTypes;
 var bufferSize = 4 * 4 * n;
 var interop = false;
+var globalWorkSize = new Int32Array([4, n]);
+var localWorkSize = new Int32Array(2);
 
 function initGL() {
     var canvas = document.getElementById("c");
@@ -203,18 +205,12 @@ function prepareCommandQueue() {
     }
 }
 
-var globalWorkSize = new Int32Array([4, n]);
-var localWorkSize = new Int32Array(2);
-
 function drawPix() {
     try {
         if (interop) {
             gl.finish();
             cmdQueue.enqueueAcquireGLObjects(bufPix);
         }
-
-        localWorkSize[0] = 1;
-        localWorkSize[1] = useGpu ? 8 : 1;
 
         cmdQueue.enqueueNDRangeKernel(kPix, [], globalWorkSize, localWorkSize);
 
@@ -396,6 +392,9 @@ function startCL() {
         }
 
         WebCLCommon.init(useGpu ? "GPU" : "CPU");
+
+        localWorkSize[0] = 1;
+        localWorkSize[1] = useGpu ? 8 : 1;
 
         runCL();
 

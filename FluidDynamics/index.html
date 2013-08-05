@@ -14,6 +14,9 @@ var n = 512, kAdvec, kForce, kP, kG, kDiv, kShow, cmdQueue,
     bufPix, outPix, bufferSize = 4 * n * n, useGpu = true, currentDevice,
     bu = 10, it = 20, delay = 0, frames = 0, time, animation;
 var types = WebCLKernelArgumentTypes;
+var globalWorkSize = new Int32Array([n, n]);
+var localWorkSize = new Int32Array(2);
+
 window.WebCL = webcl;
 
 function startCL() {
@@ -22,6 +25,10 @@ function startCL() {
     try {
 
         WebCLCommon.init(useGpu ? "GPU" : "CPU");
+
+        localWorkSize[0] = 8;
+        localWorkSize[1] = useGpu ? 8 : 1;
+
         var context = WebCLCommon.createContext();
         var kernelSrc = WebCLCommon.loadKernel("kernel.cl");
         if (!kernelSrc) {
@@ -100,11 +107,6 @@ function draw() {
     kAdvec.setArg(1, D);
     kAdvec.setArg(2, U1);
     kAdvec.setArg(3, D1);
-    var globalWorkSize = new Int32Array([n, n]);
-    var localWorkSize = new Int32Array(2);
-
-    localWorkSize[0] = 8;
-    localWorkSize[1] = useGpu ? 8 : 1;
 
     var ev = cmdQueue.enqueueNDRangeKernel(kAdvec, [], globalWorkSize, localWorkSize);
     cmdQueue.flush();

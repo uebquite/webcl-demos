@@ -16,6 +16,8 @@ var ctx_c, imgd, scale = 0.01, zoom = 1.01, zoom2 = 1.05,
     animation = "animate", time, frames = 0, delay = 0;
 var program, kernel, cmdQueue, bufCol, outBuffer, bufSize, frTimer, useGPU = true;
 var globalWS = new Int32Array(2);
+var localWorkSize = new Int32Array(2);
+
 
 function mandelbrotCL() {
     var canvas = document.getElementById("c");
@@ -47,6 +49,9 @@ function mandelbrotCL() {
 
         globalWS[0] = nx;
         globalWS[1] = ny;
+
+        localWorkSize[0] = 8;
+        localWorkSize[1] = useGPU ? 8 : 1;
 
         kernel.setArg(0, bufCol);
 
@@ -88,10 +93,6 @@ function mandelbrotCL() {
 }
 
 function draw() {
-    var localWorkSize = new Int32Array(2);
-    localWorkSize[0] = 8;
-    localWorkSize[1] = useGPU ? 8 : 1;
-
     scale /= zoom;
     dR /= zoom2;
     dI /= zoom2;

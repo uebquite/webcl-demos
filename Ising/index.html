@@ -17,10 +17,16 @@ var kSpin, kPix, cmdQueue, iSpin, iSpin1, bufRand, bufW,
     bufWSize = 4 * 5, bufPix, outBuffer;
 var types = WebCLKernelArgumentTypes;
 var useGPU = true;
+var globalWorkSize = new Int32Array([n, n]);
+var localWorkSize = new Int32Array(2);
 
 function randCL() {
     try {
         WebCLCommon.init(useGPU ? "GPU" : "CPU");
+
+        localWorkSize[0] = 8;
+        localWorkSize[1] = useGPU ? 8 : 1;
+
         var ctx = WebCLCommon.createContext();
         var kernelSrc = WebCLCommon.loadKernel("kernel.cl");
         if (!kernelSrc) {
@@ -93,14 +99,8 @@ function initImageSpin() {
     cmdQueue.enqueueWriteImage(iSpin1, true, origin, region, 0, spin);
 }
 
-var globalWorkSize = new Int32Array([n, n]);
-var localWorkSize = new Int32Array(2);
-
 function draw() {
     var i;
-
-    localWorkSize[0] = 8;
-    localWorkSize[1] = useGPU ? 8 : 1;
 
     for (i = 0; i < it;  i++) {
         kSpin.setArg(0, iSpin);
