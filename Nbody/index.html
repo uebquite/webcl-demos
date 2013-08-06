@@ -20,6 +20,11 @@
     text-align:center;
     height:30px;
 }
+.radiobtn {
+    visibility: hidden;
+    width: 60px;
+    height: 30px;
+}
 </style>
 
 <script id="point-vshader" type="x-shader/x-vertex">
@@ -221,6 +226,15 @@
 
     <div id="b4"  class="info" style="position:absolute; left: 200px; top:135px;">
         <button type="button"  class="btn" style="width:160px;" onClick="Toggle3D()">Start/Stop 3D</button>
+    </div>
+
+    <div id="devices" class="radiobtn">
+        <div id="b5" class="info" style="position:absolute; left: 390px; top:135px;">
+            GPU<input type="radio" name="device" id="GPUradio" onclick="ToggleDevice('GPU');" checked="true">
+        </div>
+        <div id="b6" class="info" style="position:absolute; left: 450px; top:135px;">
+            CPU<input type="radio" name="device" id="CPUradio" onclick="ToggleDevice('CPU');">
+        </div>
     </div>
 </div>
 

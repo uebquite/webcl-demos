@@ -41,7 +41,6 @@ var bufferSize = null;
 var globalWorkSize = new Int32Array(1);
 var localWorkSize = new Int32Array(1);
 var workGroupSize = null;
-var gpu = true;
 
 function getKernel(id) {
   var kernelScript = document.getElementById(id);
@@ -71,7 +70,7 @@ function InitCL() {
         }
         var platform = platforms[0];
 
-        var devices = platform.getDevices(gpu ? cl.DEVICE_TYPE_GPU : cl.DEVICE_TYPE_CPU);
+        var devices = platform.getDevices(userData.gpu ? cl.DEVICE_TYPE_GPU : cl.DEVICE_TYPE_CPU);
         if (devices.length === 0) {
             console.error("No devices available");
             return null;
@@ -87,9 +86,9 @@ function InitCL() {
         }
 
         if(userData.isGLCLshared)
-            context = extension.createContext({platform:platform, devices:devices, deviceType: gpu ? cl.DEVICE_TYPE_GPU : cl.DEVICE_TYPE_CPU, sharedContext:null});
+            context = extension.createContext({platform:platform, devices:devices, deviceType: userData.gpu ? cl.DEVICE_TYPE_GPU : cl.DEVICE_TYPE_CPU, sharedContext:null});
         else
-            context = cl.createContext({platform:platform, devices:devices, deviceType: gpu ? cl.DEVICE_TYPE_GPU : cl.DEVICE_TYPE_CPU});
+            context = cl.createContext({platform:platform, devices:devices, deviceType: userData.gpu ? cl.DEVICE_TYPE_GPU : cl.DEVICE_TYPE_CPU});
         if(context === null) {
             console.error("createContext fails");
             return null;
@@ -183,8 +182,8 @@ function InitCL() {
     return cl;
 }
 
-function SimulateCL(cl) {
-    if(cl === null) return;
+function SimulateCL() {
+    if (cl === null) return;
     try {
         if (userData.isGLCLshared) {
             queue.enqueueAcquireGLObjects([curPosBuffer]);
@@ -244,7 +243,7 @@ function GetWorkGroupSize() {
         }
         var platform = platforms[0];
 
-        var devices = platform.getDevices(gpu ? cl.DEVICE_TYPE_GPU : cl.DEVICE_TYPE_CPU);
+        var devices = platform.getDevices(userData.gpu ? cl.DEVICE_TYPE_GPU : cl.DEVICE_TYPE_CPU);
         if (devices.length === 0) {
             console.error("No devices available");
             return null;
