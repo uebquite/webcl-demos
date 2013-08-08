@@ -103,7 +103,7 @@ function InitCL()
         // Create a compute context
         context = cl.createContext();
         // Other way to create a webcl context is passing a property object.
-        // e.g cl.createContext({platform: platform, devices: devices, deviceType: cl.DEVICE_TYPE_GPU, shareGroup: 1});
+        // e.g cl.createContext({platform: platform, devices: devices, deviceType: cl.DEVICE_TYPE_GPU});
 
         // Create a command queue
         queue = context.createCommandQueue(device, null);

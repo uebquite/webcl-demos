@@ -171,7 +171,7 @@ Framework = (function(){
         elm.appendChild(elmSelect);
     };
 
-    var _setContextProperties = function(/* obj {platform: , devices: , deviceType: , shareGroup: } */
+    var _setContextProperties = function(/* obj {platform: , devices: , deviceType: } */
             properties) {
 
         
@@ -183,7 +183,6 @@ Framework = (function(){
         CONTEXT_PROPERTIES.platform = ((properties && properties.platform) || this.platforms[0]);
         CONTEXT_PROPERTIES.devices = ((properties && properties.devices) || this.platforms[0].getDevices());
         CONTEXT_PROPERTIES.deviceType = ((properties && properties.deviceType) || webcl.DEVICE_TYPE_ALL); 
-        CONTEXT_PROPERTIES.shareGroup = ((properties && properties.shareGroup) || 0);
     };
     
     /**
@@ -346,7 +345,7 @@ Framework = (function(){
             this.kernelSource = document.getElementById(idSrc).firstChild.textContent;
         },
         
-        createContext : function(/* obj {platform: , devices, deviceType, shareGroup } */ 
+        createContext : function(/* obj {platform: , devices, deviceType } */ 
                 properties){
             
             _setContextProperties(properties);

@@ -145,14 +145,12 @@ window.WebCLCommon = (function (debug) {
 
             try {
                 if (resource) {
-                    ctxProps.shareGroup = (props && props.shareGroup) ? props.shareGroup : 1;
                     extension = webcl.getExtension(resource);
                     if (!extension) {
                         throw new Error(EXTENSION_NOT_SUPPORTED);
                     }
                     context = extension.createContext(ctxProps);
                 } else {
-                    ctxProps.shareGroup = (props && props.shareGroup) ? props.shareGroup : 0;
                     context = webcl.createContext(ctxProps);
                 }
             } catch (e) {
