@@ -151,16 +151,16 @@ function InitCL() {
 
         // Initial load of position and velocity data
         if(userData.isGLCLshared) {
-            queue.enqueueAcquireGLObjects(curPosBuffer);
-            queue.enqueueAcquireGLObjects(curVelBuffer);
+            queue.enqueueAcquireGLObjects([curPosBuffer]);
+            queue.enqueueAcquireGLObjects([curVelBuffer]);
         }
 
         queue.enqueueWriteBuffer(curPosBuffer, true, 0, bufferSize, userData.curPos);
         queue.enqueueWriteBuffer(curVelBuffer, true, 0, bufferSize, userData.curVel);
 
         if(userData.isGLCLshared) {
-            queue.enqueueReleaseGLObjects(curPosBuffer);
-            queue.enqueueReleaseGLObjects(curVelBuffer);
+            queue.enqueueReleaseGLObjects([curPosBuffer]);
+            queue.enqueueReleaseGLObjects([curVelBuffer]);
         }
 
         queue.finish();
@@ -187,8 +187,8 @@ function SimulateCL(cl) {
     if(cl === null) return;
     try {
         if (userData.isGLCLshared) {
-            queue.enqueueAcquireGLObjects(curPosBuffer);
-            queue.enqueueAcquireGLObjects(curVelBuffer);
+            queue.enqueueAcquireGLObjects([curPosBuffer]);
+            queue.enqueueAcquireGLObjects([curVelBuffer]);
         }
         var karg = WebCLKernelArgumentTypes;
         var localMemSize = localWorkSize[0] * POS_ATTRIB_SIZE * Float32Array.BYTES_PER_ELEMENT;
@@ -209,8 +209,8 @@ function SimulateCL(cl) {
         queue.enqueueCopyBuffer(nxtVelBuffer, curVelBuffer, 0, 0, bufferSize);
 
         if (userData.isGLCLshared) {
-            queue.enqueueReleaseGLObjects(curPosBuffer);
-            queue.enqueueReleaseGLObjects(curVelBuffer);
+            queue.enqueueReleaseGLObjects([curPosBuffer]);
+            queue.enqueueReleaseGLObjects([curVelBuffer]);
         }
 
         // read back if buffers not shared or using non-GL draw mode
