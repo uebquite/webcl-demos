@@ -28,7 +28,7 @@
 var WINW                = 400;          // drawing canvas width
 var WINH                = 400;          // drawing canvas height
 
-var NBODY               = 1024;         // default number of particles to simulate
+var NBODY               = 4096;         // default number of particles to simulate
 var INNER_FLOPS         = 25;           // number of flops in inner loop of simulation
 
 var SAMPLEPERIOD        = 10;           // calculate fps and sim/draw times over this many frames
@@ -110,8 +110,9 @@ function onLoad() {
     userData.simSampler = new MSecSampler(SAMPLEPERIOD, "sms");
     userData.drawSampler = new MSecSampler(SAMPLEPERIOD, "dms");
 
+    // setup work group size
     var clWorkGroupSize = GetWorkGroupSize();
-    if(clWorkGroupSize !== null) {
+    if (clWorkGroupSize !== null) {
         // assure particle count is a workgroup size multiple
         NBODY = 4 * clWorkGroupSize;
     }
@@ -176,7 +177,7 @@ function MainLoop() {
             SimulateJS();
         }
         else {
-            SimulateCL();
+            SimulateCL(userData.cl);
         }
     }
     userData.simSampler.endFrame();
