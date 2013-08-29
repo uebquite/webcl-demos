@@ -211,7 +211,7 @@ function drawPix() {
     try {
         if (interop) {
             gl.finish();
-            cmdQueue.enqueueAcquireGLObjects(bufPix);
+            cmdQueue.enqueueAcquireGLObjects([bufPix]);
         }
 
         cmdQueue.enqueueNDRangeKernel(kPix, [], globalWorkSize, localWorkSize);
@@ -219,7 +219,7 @@ function drawPix() {
         if (!interop) {
             cmdQueue.enqueueReadBuffer(bufPix, true, 0, bufferSize * 2, outBuffer);
         } else {
-            cmdQueue.enqueueReleaseGLObjects(bufPix);
+            cmdQueue.enqueueReleaseGLObjects([bufPix]);
             cmdQueue.finish();
         }
 
@@ -239,7 +239,7 @@ function drawPix() {
         gl.drawArrays(gl.LINE_STRIP, 3 * n, n);
         gl.flush();
     } catch (e) {
-        alert("Drawpix error = " + e.message);
+        console.error("Drawpix error = " + e.message);
     }
 }
 
@@ -408,6 +408,18 @@ function startCL() {
 
 function resetCL() {
     window.clearInterval(frTimer);
+    animation = "stop";
+    if (useGpu) {
+        document.getElementById('interopBtn').style.visibility = "visible";
+    }
+    else {
+        if (interop === true) {
+            document.getElementById('interopBtn').value = "Enable CL/GL Interoperability";
+            interop = false;
+        }
+        document.getElementById('interopBtn').style.visibility = "hidden";
+    }
+    animation = "animate";
     startCL();
 }
 </script>
@@ -421,7 +433,6 @@ function resetCL() {
 <p id="output"></p>
 <canvas id="c" width="512" height="512"></canvas>
 <br><button onclick="reset();">Reset</button>
-<input type="button" onclick="runInterop();" value="Enable CL/GL Interoperability" size="1" id="interopBtn">
 <input type="button" onclick="run();" value="Stop" size="1" id="runBtn">
 &gamma;<input type="text" size="3" value="0.01" onchange="setGa(this.value);">
 It<input type="text" size="3" value="10" onchange="setIt(this.value);">
@@ -436,4 +447,5 @@ Plane:
 Device:
 <input type="radio" name="r2" id="CPU" onclick="useGpu=false;resetCL();">CPU
 <input type="radio" name="r2" id="GPU" onclick="useGpu=true;resetCL();" checked="true">GPU
+<input type="button" onclick="runInterop();" value="Enable CL/GL Interoperability" size="1" id="interopBtn">
 </body></html>
