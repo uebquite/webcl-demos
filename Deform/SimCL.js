@@ -200,8 +200,8 @@ function SimulateCL(cl)
       return;
 
     if (GLCL_SHARE_MODE) {
-      queue.enqueueAcquireGLObjects(curNorBuffer);
-      queue.enqueueAcquireGLObjects(curNorBuffer);
+      queue.enqueueAcquireGLObjects([curNorBuffer]);
+      queue.enqueueAcquireGLObjects([curNorBuffer]);
     }
 
     var kernelArgType = WebCLKernelArgumentTypes;
@@ -221,8 +221,8 @@ function SimulateCL(cl)
     queue.finish();
 
     if (GLCL_SHARE_MODE) {
-      queue.enqueueReleaseGLObjects(curPosBuffer);
-      queue.enqueueReleaseGLObjects(curNorBuffer);
+      queue.enqueueReleaseGLObjects([curPosBuffer]);
+      queue.enqueueReleaseGLObjects([curNorBuffer]);
     } else {
       var bufferSize = userData.nVertices * NUM_VERTEX_COMPONENTS * Float32Array.BYTES_PER_ELEMENT;
       queue.enqueueReadBuffer(curPosBuffer, true, 0, bufferSize, userData.curPos );
