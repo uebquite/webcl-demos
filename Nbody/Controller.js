@@ -100,7 +100,8 @@ function RANDM1TO1() { return Math.random() * 2 - 1; }
 function RAND0TO1() { return Math.random(); }
 
 function onLoad() {
-    if(WINW !== WINH) {
+
+    if (WINW !== WINH) {
         console.error("Error: drawing canvas must be square");
         return;
     }
@@ -110,146 +111,128 @@ function onLoad() {
     userData.simSampler = new MSecSampler(SAMPLEPERIOD, "sms");
     userData.drawSampler = new MSecSampler(SAMPLEPERIOD, "dms");
 
-    // setup work group size
-    var clWorkGroupSize = GetWorkGroupSize();
-    if (clWorkGroupSize !== null) {
-        // assure particle count is a workgroup size multiple
-        NBODY = 4 * clWorkGroupSize;
-    }
-
     userData.curPos = new Float32Array(NBODY * POS_ATTRIB_SIZE);
     userData.curVel = new Float32Array(NBODY * VEL_ATTRIB_SIZE);
     userData.nxtPos = new Float32Array(NBODY * POS_ATTRIB_SIZE);
     userData.nxtVel = new Float32Array(NBODY * VEL_ATTRIB_SIZE);
 
-    InitParticleState();
+    initParticleState();
 
-    userData.ctx = InitJS("canvas2D");
-    userData.gl  = InitGL("canvas3D");
-    userData.cl  = InitCL();
+    userData.ctx = initJS("canvas2D");
+    userData.gl  = initGL("canvas3D");
+    userData.cl  = initCL();
 
-    SetSimMode(JS_SIM_MODE);
-    SetDrawMode(JS_DRAW_MODE);
+    setSimMode(JS_SIM_MODE);
+    setDrawMode(JS_DRAW_MODE);
 
-    setInterval( MainLoop, 0 );
-    setInterval( function() { userData.fpsSampler.display(); }, DISPLAYPERIOD);
-    setInterval( function() { userData.simSampler.display(); }, DISPLAYPERIOD);
-    setInterval( function() { userData.drawSampler.display(); }, DISPLAYPERIOD);
-    setInterval( ShowFLOPS, 2*DISPLAYPERIOD);
+    setInterval(mainLoop, 0);
+    setInterval(function () {userData.fpsSampler.display(); }, DISPLAYPERIOD);
+    setInterval(function () {userData.simSampler.display(); }, DISPLAYPERIOD);
+    setInterval(function () {userData.drawSampler.display(); }, DISPLAYPERIOD);
+    setInterval(showFLOPS, 2 * DISPLAYPERIOD);
 }
 
-function ShowFLOPS() {
+function showFLOPS() {
     var flops = 0;
-    if(userData.simSampler.ms > 0)
+    if (userData.simSampler.ms > 0) {
         flops = (INNER_FLOPS * NBODY * NBODY * 1000) / (userData.simSampler.ms);
+    }
 
-    if(flops > 1000 * 1000 * 1000) {
+    if (flops > 1000 * 1000 * 1000) {
         flops = Math.round(flops / (1000 * 1000 * 1000));
         document.getElementById("f1").firstChild.nodeValue = "GFLOPS:";
-    }
-    else {
+    } else {
         flops = Math.round(flops / (1000 * 1000));
         document.getElementById("f1").firstChild.nodeValue = "MFLOPS:";
     }
+
     document.getElementById("f2").firstChild.nodeValue = flops;
 }
 
-function InitParticleState() {
-    //InitRandomParticles();
-    //InitParticlesOnSphere();
-    //InitParticlesOnDisc();
-    InitParticlesOnSpinningDisc();
-    //InitParticlesOnRing();
-    //InitTwoParticles();
-    //InitFourParticles();
+function initParticleState() {
+    initParticlesOnSpinningDisc();
 
     document.getElementById("num").firstChild.nodeValue = NBODY;
 }
 
-function MainLoop() {
+function mainLoop() {
 
     userData.drawSampler.endFrame();    // started at beginning of previous Draw()
     userData.fpsSampler.markFrame();    // count a new frame
 
     userData.simSampler.startFrame();
-    if(userData.isSimRunning) {
-        if(userData.simMode === JS_SIM_MODE) {
-            SimulateJS();
-        }
-        else {
-            SimulateCL(userData.cl);
+    if (userData.isSimRunning) {
+        if (userData.simMode === JS_SIM_MODE) {
+            simulateJS();
+        } else {
+            simulateCL(userData.cl);
         }
     }
     userData.simSampler.endFrame();
 
     userData.drawSampler.startFrame();
-    Draw();
-    // end drawSampler when we re-enter MainLoop()
+    draw();
+    // end drawSampler when we re-enter mainLoop()
 }
 
-function Draw() {
-    if(userData.drawMode === JS_DRAW_MODE)
-        DrawJS(userData.ctx);
-    else
-        DrawGL(userData.gl);
+function draw() {
+
+    if (userData.drawMode === JS_DRAW_MODE) {
+        drawJS(userData.ctx);
+    } else {
+        drawGL(userData.gl);
+    }
 }
 
-function SetSimMode(simMode) {
+function setSimMode(simMode) {
     var div = document.getElementById("sim");
 
-    if(simMode === JS_SIM_MODE) {
+    if (simMode === JS_SIM_MODE) {
         div.firstChild.nodeValue = "JS";
         document.getElementById("devices").style.visibility = "hidden";
-    }
-    else {
-        div.firstChild.nodeValue = (userData.cl === null)? "NA" : "CL";
+    } else {
+        div.firstChild.nodeValue = (userData.cl === null) ? "NA" : "CL";
         document.getElementById("devices").style.visibility = "visible";
     }
 
     userData.simMode = simMode;
 }
 
-function SetDrawMode(drawMode) {
+function setDrawMode(drawMode) {
     var canvas2D = document.getElementById("canvas2D");
     var canvas3D = document.getElementById("canvas3D");
     var div = document.getElementById("drw");
 
-    if(drawMode === JS_DRAW_MODE) {
+    if (drawMode === JS_DRAW_MODE) {
         canvas2D.style.visibility = "visible";
         canvas3D.style.visibility = "hidden";
         div.firstChild.nodeValue = "JS";
-    }
-    else {
+    } else {
         canvas2D.style.visibility = "hidden";
         canvas3D.style.visibility = "visible";
-        div.firstChild.nodeValue = (userData.gl === null)? "NA" : "GL";
+        div.firstChild.nodeValue = (userData.gl === null) ? "NA" : "GL";
     }
 
     userData.drawMode = drawMode;
 }
 
-function ToggleDrawMode()
-{
-    SetDrawMode(!userData.drawMode);
+function toggleDrawMode() {
+    setDrawMode(!userData.drawMode);
 }
 
-function ToggleSimMode()
-{
-    SetSimMode(!userData.simMode);
+function toggleSimMode() {
+    setSimMode(!userData.simMode);
 }
 
-function ToggleSimRunning()
-{
+function toggleSimRunning() {
     userData.isSimRunning = !userData.isSimRunning;
 }
 
-function Toggle3D()
-{
+function toggle3D() {
     userData.is3D = !userData.is3D;
 }
 
-function ToggleDevice(device)
-{
+function toggleDevice(device) {
     userData.gpu = (device === 'CPU') ? false : true;
-    InitCL();
+    initCL();
 }
