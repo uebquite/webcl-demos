@@ -44,14 +44,15 @@ var workGroupSize = null;
 var bodyCountPerGroup;
 
 function getKernel(id) {
-  var kernelScript = document.getElementById(id);
-  if (kernelScript === null || kernelScript.type !== "x-kernel")
-    return null;
+    var kernelScript = document.getElementById(id);
+    if (kernelScript === null || kernelScript.type !== "x-kernel") {
+        return null;
+    }
 
-  return kernelScript.firstChild.textContent;
+    return kernelScript.firstChild.textContent;
 }
 
-function InitCL() {
+function initCL() {
     var cl = null;
 
     // Just disable CL-GL interop when CPU is being used
@@ -62,7 +63,7 @@ function InitCL() {
     }
 
     try {
-        if (typeof(webcl) === "undefined") {
+        if (webcl === "undefined") {
             console.error("WebCL is yet to be defined");
             return null;
         }
@@ -87,18 +88,21 @@ function InitCL() {
         var device = devices[0];
 
         var extension = null;
-        if(userData.isGLCLshared) {
+        if (userData.isGLCLshared) {
             extension = cl.getExtension("KHR_GL_SHARING");
 
-            if (extension === null)
+            if (extension === null) {
                 userData.isGLCLshared = false;
+            }
         }
 
-        if(userData.isGLCLshared)
-            context = extension.createContext({platform:platform, devices:devices, deviceType: userData.gpu ? cl.DEVICE_TYPE_GPU : cl.DEVICE_TYPE_CPU, sharedContext:null});
-        else
-            context = cl.createContext({platform:platform, devices:devices, deviceType: userData.gpu ? cl.DEVICE_TYPE_GPU : cl.DEVICE_TYPE_CPU});
-        if(context === null) {
+        if (userData.isGLCLshared) {
+            context = extension.createContext({platform: platform, devices: devices, deviceType: userData.gpu ? cl.DEVICE_TYPE_GPU : cl.DEVICE_TYPE_CPU, sharedContext: null});
+        } else {
+            context = cl.createContext({platform: platform, devices: devices, deviceType: userData.gpu ? cl.DEVICE_TYPE_GPU : cl.DEVICE_TYPE_CPU});
+        }
+
+        if (context === null) {
             console.error("createContext fails");
             return null;
         }
@@ -116,7 +120,7 @@ function InitCL() {
 
         bufferSize = NBODY * POS_ATTRIB_SIZE * Float32Array.BYTES_PER_ELEMENT;
 
-        if(userData.isGLCLshared) {
+        if (userData.isGLCLshared) {
             // Create CL buffers from GL VBOs
             // (Initial load of positions is via gl.bufferData)
             curPosBuffer = context.createFromGLBuffer(cl.MEM_READ_WRITE, userData.curPosVBO);
@@ -132,13 +136,13 @@ function InitCL() {
             }
         } else {
             curPosBuffer = context.createBuffer(cl.MEM_READ_WRITE, bufferSize);
-            if(curPosBuffer === null) {
+            if (curPosBuffer === null) {
                 console.error("Failed to allocate device memory");
                 return null;
             }
 
             curVelBuffer = context.createBuffer(cl.MEM_READ_WRITE, bufferSize);
-            if(curVelBuffer === null) {
+            if (curVelBuffer === null) {
                 console.error("Failed to allocate device memory");
                 return null;
             }
@@ -158,7 +162,7 @@ function InitCL() {
         }
 
         // Initial load of position and velocity data
-        if(userData.isGLCLshared) {
+        if (userData.isGLCLshared) {
             queue.enqueueAcquireGLObjects([curPosBuffer]);
             queue.enqueueAcquireGLObjects([curVelBuffer]);
         }
@@ -166,23 +170,24 @@ function InitCL() {
         queue.enqueueWriteBuffer(curPosBuffer, true, 0, bufferSize, userData.curPos);
         queue.enqueueWriteBuffer(curVelBuffer, true, 0, bufferSize, userData.curVel);
 
-        if(userData.isGLCLshared) {
+        if (userData.isGLCLshared) {
             queue.enqueueReleaseGLObjects([curPosBuffer]);
             queue.enqueueReleaseGLObjects([curVelBuffer]);
         }
 
         queue.finish();
 
-        if (userData.gpu) {
-            globalWorkSize[0] = NBODY;
-        }
+        globalWorkSize[0] = NBODY;
+
+        setWorkGroupSize(cl, device);
 
         localWorkSize[0] = userData.gpu ? Math.min(workGroupSize, NBODY) : 1;
         bodyCountPerGroup = NBODY / globalWorkSize[0];
 
-        var nWorkGroups = Math.floor(NBODY/workGroupSize);
-        if(NBODY % workGroupSize != 0)
+        var nWorkGroups = Math.floor(NBODY / workGroupSize);
+        if (NBODY % workGroupSize !== 0) {
             nWorkGroups += 1;
+        }
 
         console.log("NBODY:             " + NBODY);
         console.log("workGroupSize:     " + workGroupSize);
@@ -192,12 +197,12 @@ function InitCL() {
         console.log("bodyCountPerGroup: " + bodyCountPerGroup);
         console.log("kernel:            " + kernel.getInfo(cl.KERNEL_FUNCTION_NAME));
     } catch (e) {
-        console.error("Nbody Demo Failed, Message: "+ e.message);
+        console.error("Nbody Demo Failed, Message: " + e.message);
     }
     return cl;
 }
 
-function SimulateCL(cl) {
+function simulateCL(cl) {
     if (cl === null) {
         return;
     }
@@ -242,43 +247,19 @@ function SimulateCL(cl) {
             queue.enqueueReadBuffer(curVelBuffer, true, 0, bufferSize, userData.curVel);
         }
     } catch (e) {
-        console.error("Nbody Demo Failed, Message: "+ e.message);
+        console.error("Nbody Demo Failed, Message: " + e.message);
     }
 }
 
-function GetWorkGroupSize() {
-    if(workGroupSize !== null)
-        return workGroupSize;
+function setWorkGroupSize(cl, device) {
     try {
-        if (typeof(webcl) === "undefined") {
-            console.error("WebCL is yet to be defined");
-            return null;
-        }
-        cl = webcl;
-        if (cl === null) {
-            console.error("No webcl object available");
-            return null;
-        }
-
-        var platforms = cl.getPlatforms();
-        if (platforms.length === 0) {
-            console.error("No platforms available");
-            return null;
-        }
-        var platform = platforms[0];
-
-        var devices = platform.getDevices(userData.gpu ? cl.DEVICE_TYPE_GPU : cl.DEVICE_TYPE_CPU);
-        if (devices.length === 0) {
-            console.error("No devices available");
-            return null;
-        }
-        var device = devices[0];
-
         workGroupSize = device.getInfo(cl.DEVICE_MAX_WORK_GROUP_SIZE);
-        globalWorkSize[0] = device.getInfo(cl.DEVICE_MAX_COMPUTE_UNITS);
     } catch (e) {
-        console.error("Nbody Demo Failed, Message: "+ e.message);
+        console.error("Nbody Demo Failed, Message: " + e.message);
         workGroupSize = null;
     }
+}
+
+function getWorkGroupSize() {
     return workGroupSize;
 }

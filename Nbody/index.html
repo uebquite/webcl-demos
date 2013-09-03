@@ -2,7 +2,7 @@
 <html>
 <head>
 <title>NBody Simulation</title>
-<meta HTTP-EQUIV="CACHE-CONTROL" CONTENT="NO-CACHE">
+<meta http-equiv="CACHE-CONTROL" content="NO-CACHE">
 
 <style type="text/css">
 .info {
@@ -65,7 +65,6 @@
         float r1 = 0.1;
 
         if(r < 0.5)
-            //gl_FragColor = vColor;
             gl_FragColor = 2.0 * (0.5 - r) * vColor;
 
         if(r >= 0.5)
@@ -87,7 +86,6 @@
         pos.xyz = cube.xyz;
         pos.w  = 1.0;
         gl_Position = mvp * pos;
-        //gl_Position = pos;
     }
 </script>
 
@@ -119,7 +117,7 @@
     float inverse_distance, s, distSqr;
 
     for (l = 0; l < bodyCountPerGroup; l++) {
-        k = l+start;//4*(l + start);
+        k = l + start;
         myPos = curPos[k];
         acc = (float4) (0,0,0,0);
 #pragma unroll
@@ -199,8 +197,6 @@
             }
             // Synchronize to make sure data is available for processing
             barrier(CLK_LOCAL_MEM_FENCE);
-            // calculate acceleration effect due to each body
-            // a[i->j] = m[j] * r[i->j] / (r^2 + epsSqr)^(3/2)
             for(int j = 0; j < localSize; ++j)
             {
                 // Calculate acceleration caused by particle j on particle i
@@ -251,7 +247,6 @@
     }
 </script>
 
-<!-- <script src="Util/opencl.js"></script> -->
 <script src="Util/sampler.js"></script>
 <script src="Util/shader.js"></script>
 <script src="Util/J3DIMath.js"></script>
@@ -264,8 +259,8 @@
 
 </head>
 
-<body onload="onLoad()" bgColor=black>
-<div style="position:absolute; left:0px; top:0px">
+<body onload="onLoad();" bgcolor=black>
+<div style="position:absolute; left:0px; top:0px;">
     <div          class="info" style="position:absolute; left:  0px; top:15px; width:130px;">Frame Rate:</div>
     <div id="fps" class="info" style="position:absolute; left:115px; top:15px; width: 60px;">XX</div>
 
@@ -275,34 +270,34 @@
     <div          class="info" style="position:absolute; left:  0px; top:40px; width:130px;">Particles:</div>
     <div id="num" class="info" style="position:absolute; left:115px; top:40px; width: 60px;">XX</div>
 
-    <div id="b1"  class="info" style="position:absolute; left: 30px; top:65px">
-        <button type="button" class="btn" style="width:160px; height=40px;" onClick="ToggleSimMode()">Toggle Sim Mode</button>
+    <div id="b1"  class="info" style="position:absolute; left: 30px; top:65px;">
+        <button type="button" class="btn" style="width:160px; height:40px;" onclick="toggleSimMode();">Toggle Sim Mode</button>
     </div>
     <div          class="info" style="position:absolute; left:185px; top:70px; width: 60px;">Sim:</div>
     <div id="sim" class="info" style="position:absolute; left:215px; top:70px; width: 60px;">XX</div>
     <div id="sms" class="info" style="position:absolute; left:260px; top:70px; width: 80px;">XX</div>
 
-    <div id="b2"  class="info" style="position:absolute; left: 30px; top:100px">
-        <button type="button"  class="btn" style="width:160px;" onClick="ToggleDrawMode()">Toggle Draw Mode</button>
+    <div id="b2"  class="info" style="position:absolute; left: 30px; top:100px;">
+        <button type="button"  class="btn" style="width:160px;" onclick="toggleDrawMode();">Toggle Draw Mode</button>
     </div>
     <div          class="info" style="position:absolute; left:185px; top:105px; width: 60px;">Draw:</div>
     <div id="drw" class="info" style="position:absolute; left:215px; top:105px; width: 60px;">XX</div>
     <div id="dms" class="info" style="position:absolute; left:260px; top:105px; width: 80px;">XX</div>
 
     <div id="b3"  class="info" style="position:absolute; left: 30px; top:135px;">
-        <button type="button"  class="btn" style="width:160px;" onClick="ToggleSimRunning()">Start/Stop Sim</button>
+        <button type="button"  class="btn" style="width:160px;" onclick="toggleSimRunning();">Start/Stop Sim</button>
     </div>
 
     <div id="b4"  class="info" style="position:absolute; left: 200px; top:135px;">
-        <button type="button"  class="btn" style="width:160px;" onClick="Toggle3D()">Start/Stop 3D</button>
+        <button type="button"  class="btn" style="width:160px;" onclick="toggle3D();">Start/Stop 3D</button>
     </div>
 
     <div id="devices" class="radiobtn">
         <div id="b5" class="info" style="position:absolute; left: 390px; top:135px;">
-            GPU<input type="radio" name="device" id="GPUradio" onclick="ToggleDevice('GPU');" checked="true">
+            GPU<input type="radio" name="device" id="GPUradio" onclick="toggleDevice('GPU');" checked="true">
         </div>
         <div id="b6" class="info" style="position:absolute; left: 450px; top:135px;">
-            CPU<input type="radio" name="device" id="CPUradio" onclick="ToggleDevice('CPU');">
+            CPU<input type="radio" name="device" id="CPUradio" onclick="toggleDevice('CPU');">
         </div>
     </div>
 </div>
