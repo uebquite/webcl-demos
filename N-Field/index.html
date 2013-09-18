@@ -22,9 +22,11 @@ var time;
 var frTimer;
 var animation;
 var useGPU    = true;
+var interop   = false;
 
 var cmdQueue;
 var bufPix;
+var bufPixTex;
 var bufRand;
 var iSpin;
 var iSpin1;
@@ -36,16 +38,26 @@ var region         = new Int32Array([n, n, 1]);
 var globalWorkSize = new Int32Array([n, n]);
 var localWorkSize;
 
+function init() {
 
-function runCL() {
+    canvas = document.getElementById("c");
+    init_gl(canvas, n, n);
+    init_cl();
+    frTimer = setInterval(fr, 500);
+    time = new Date().getTime();
+    animation = "animate";
+    anim();
+}
+
+function init_cl() {
     var canvas;
     var ctx;
     var descriptor;
     var i;
+    var ctxProperties;
     var kernelSrc;
     var no;
     var p;
-    var program;
     var spin;
     var UIrand;
     var x;
@@ -81,42 +93,45 @@ function runCL() {
     }
 
     try {
+        ctxProperties = {};
+        ctxProperties.extension = "KHR_GL_SHARING";
         WebCLCommon.init(useGPU ? "GPU" : "CPU");
-        ctx = WebCLCommon.createContext();
+        ctx = WebCLCommon.createContext(ctxProperties);
         program  = WebCLCommon.createProgramBuild(kernelSrc);
         cmdQueue = WebCLCommon.createCommandQueue();
 
         descriptor = {channelOrder: webcl.RGBA,
-                        channelType: webcl.FLOAT,
-                        width: n, height: n, rowPitch: 0};
+                      channelType: webcl.FLOAT,
+                      width: n, height: n, rowPitch: 0};
 
         bufRand = ctx.createBuffer(webcl.MEM_READ_WRITE, bufSize);
         bufPix  = ctx.createBuffer(webcl.MEM_WRITE_ONLY, bufSize);
         iSpin   = ctx.createImage(webcl.MEM_READ_WRITE, descriptor);
         iSpin1  = ctx.createImage(webcl.MEM_READ_WRITE, descriptor);
+        bufPixTex = ctx.createFromGLTexture(webcl.MEM_WRITE_ONLY,
+                                            gl.TEXTURE_2D, 0, texture);
 
         cmdQueue.enqueueWriteBuffer(bufRand, true, 0, bufSize, UIrand);
         cmdQueue.enqueueWriteImage(iSpin, true, origin, region, 0, spin);
 
         kSpin = program.createKernel("kSpin");
-        kPix  = program.createKernel("kPix");
+        if (interop) {
+            kPix  = program.createKernel("kPixInterop");
+            kPix.setArg(1, bufPixTex);
+        }
+        else {
+            kPix  = program.createKernel("kPix");
+            kPix.setArg(1, bufPix);
+        }
 
         kSpin.setArg(1, bufRand);
         kSpin.setArg(4, 1 / T, WebCLKernelArgumentTypes.FLOAT);
 
         kPix.setArg(0, iSpin);
-        kPix.setArg(1, bufPix);
     } catch (e) {
         console.error(e);
         throw e;
     }
-
-    canvas = document.getElementById("c");
-    init_gl(canvas);
-    frTimer = setInterval(fr, 500);
-    time = new Date().getTime();
-    animation = "animate";
-    anim();
 }
 
 function draw() {
@@ -129,23 +144,39 @@ function draw() {
             kSpin.setArg(2, iSpin1);
             kSpin.setArg(3, 0, WebCLKernelArgumentTypes.INT);
 
-            cmdQueue.enqueueNDRangeKernel(kSpin, null, globalWorkSize, localWorkSize);
+            cmdQueue.enqueueNDRangeKernel(kSpin, null, globalWorkSize,
+                                          localWorkSize);
             cmdQueue.flush();
 
             kSpin.setArg(0, iSpin1);
             kSpin.setArg(2, iSpin);
             kSpin.setArg(3, 1, WebCLKernelArgumentTypes.INT);
 
-            cmdQueue.enqueueNDRangeKernel(kSpin, null, globalWorkSize, localWorkSize);
+            cmdQueue.enqueueNDRangeKernel(kSpin, null, globalWorkSize,
+                                          localWorkSize);
             cmdQueue.flush();
         }
-        cmdQueue.enqueueNDRangeKernel(kPix, null, globalWorkSize, localWorkSize);
-        cmdQueue.enqueueReadBuffer(bufPix, true, 0, bufSize, outBuffer);
+
+        if (interop) {
+            gl.finish();
+            cmdQueue.enqueueAcquireGLObjects([bufPixTex]);
+        }
+
+        cmdQueue.enqueueNDRangeKernel(kPix, null, globalWorkSize,
+                                      localWorkSize);
+
+        if (interop) {
+            cmdQueue.enqueueReleaseGLObjects([bufPixTex]);
+        } else {
+            cmdQueue.enqueueReadBuffer(bufPix, true, 0, bufSize, outBuffer);
+        }
+
+        cmdQueue.finish();
     } catch (e) {
         console.error(e.message);
     }
 
-    draw_gl(n, n, outBuffer);
+    draw_gl(n, n, outBuffer, interop);
     frames++;
 }
 
@@ -167,7 +198,7 @@ function anim() {
     draw();
     switch (animation) {
     case "reset":
-        runCL();
+        init_cl();
         animate();
         break;
 
@@ -230,7 +261,24 @@ function setIt(val) {
 function toogleDevice(device) {
     window.clearInterval(frTimer);
     useGPU = (device === 'CPU') ? false : true;
-    runCL();
+    interop = true;
+    toogleInterop();
+}
+
+function toogleInterop() {
+    var interopElem;
+
+    window.clearInterval(frTimer);
+    interopElem = document.getElementById("interopButton");
+
+    interop = !interop;
+    if (interop) {
+        interopElem.value = "Disable Interop";
+    } else {
+        interopElem.value = "Enable Interop";
+    }
+
+    init_cl();
 }
 
 </script>
@@ -251,7 +299,7 @@ function toogleDevice(device) {
 
 </head>
 
-<body onload="runCL();">
+<body onload="init();">
 
 <h1>n-field model</h1>
 
@@ -265,6 +313,7 @@ delay<input size="2" value="0" type="text" onchange="setDelay(this.value);">
 fps<input size="2" type="text" id="framerate">
 GPU<input type="radio" name="device" id="GPUradio" onclick="toogleDevice('GPU');" checked="true">
 CPU<input type="radio" name="device" id="CPUradio" onclick="toogleDevice('CPU');">
+<input type="button" value="Enable Interop" id="interopButton" onclick="toogleInterop();">
 
 <br>GPU based Monte-Carlo simulation of the n-field model on the square 512&times;512 grid.
 <i>it</i> is the number of MC iterations per frame.
