@@ -17,16 +17,28 @@ var ctx_c, imgd, scale = 0.01, zoom = 1.01, zoom2 = 1.05,
 var program, kernel, cmdQueue, bufCol, outBuffer, bufSize, frTimer, useGPU = true;
 var globalWS = new Int32Array(2);
 var localWorkSize = new Int32Array(2);
+var interop = false;
+var bufPixTex;
+var curKernelName = "ckManZ2sm";
 
+function setKernelFirstParameter() {
+    if (interop) {
+        kernel.setArg(0, bufPixTex);
+    } else {
+        kernel.setArg(0, bufCol);
+    }
+}
 
 function mandelbrotCL() {
     var canvas = document.getElementById("c");
     canvas.addEventListener('mouseup', ev_mouseup, false);
 
-    init_gl(canvas, false);
-
     nx = canvas.width;
     ny = canvas.height;
+
+    init_gl(canvas, nx, ny, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, nx, ny, 0,
+                  gl.RGBA, gl.UNSIGNED_BYTE, null);
 
     bufSize = 4 * nx * ny;
 
@@ -40,12 +52,18 @@ function mandelbrotCL() {
 
         WebCLCommon.init(useGPU ? "GPU" : "CPU");
 
-        var ctx = WebCLCommon.createContext();
+        var ctxProperties = {};
+        ctxProperties.extension = "KHR_GL_SHARING";
+        var ctx = WebCLCommon.createContext(ctxProperties);
         program = WebCLCommon.createProgramBuild(kernelSrc);
         cmdQueue = WebCLCommon.createCommandQueue();
 
         bufCol = ctx.createBuffer(webcl.MEM_WRITE_ONLY, bufSize);
-        kernel = program.createKernel("ckManZ2sm");
+        bufPixTex = ctx.createFromGLTexture(webcl.MEM_WRITE_ONLY,
+                                            gl.TEXTURE_2D, 0, texture);
+
+        kernel = program.createKernel(curKernelName);
+        setKernelFirstParameter();
 
         globalWS[0] = nx;
         globalWS[1] = ny;
@@ -53,10 +71,7 @@ function mandelbrotCL() {
         localWorkSize[0] = 8;
         localWorkSize[1] = useGPU ? 8 : 1;
 
-        kernel.setArg(0, bufCol);
-
         outBuffer = new Uint8Array(Uint8Array.BYTES_PER_ELEMENT * bufSize);
-
     } catch (e) {
         console.error("ERROR: " + e.message, e);
         throw e;
@@ -99,10 +114,22 @@ function draw() {
     kernel.setArg(1, scale, WebCLKernelArgumentTypes.FLOAT);
     kernel.setArg(2, Ro + dR, WebCLKernelArgumentTypes.FLOAT);
     kernel.setArg(3, Io + dI, WebCLKernelArgumentTypes.FLOAT);
+
+    if (interop) {
+        gl.finish();
+        cmdQueue.enqueueAcquireGLObjects([bufPixTex]);
+    }
+
     cmdQueue.enqueueNDRangeKernel(kernel, null, globalWS, localWorkSize);
-    cmdQueue.enqueueReadBuffer(bufCol, true, 0, bufSize, outBuffer);
+
+    if (interop) {
+        cmdQueue.enqueueReleaseGLObjects([bufPixTex]);
+    } else {
+        cmdQueue.enqueueReadBuffer(bufCol, true, 0, bufSize, outBuffer);
+    }
+
     cmdQueue.finish();
-    draw_gl(nx, ny, outBuffer);
+    draw_gl(nx, ny, outBuffer, interop);
     frames++;
 }
 
@@ -118,8 +145,14 @@ function anim(v) {
 }
 
 function setFormula(s) {
-    kernel = program.createKernel(s);
-    kernel.setArg(0, bufCol);
+    if (interop) {
+        s += "Interop";
+    }
+
+    curKernelName = s;
+    kernel = program.createKernel(curKernelName);
+    setKernelFirstParameter();
+
     scale = 0.01;
     if (animation === "stop") {
         animation = "animate";
@@ -160,9 +193,39 @@ function fr() {
 }
 
 function toogleDevice(device) {
+    var interopElem;
+
     window.clearInterval(frTimer);
     useGPU = (device === 'CPU') ? false : true;
+
+    interop = false;
+    interopElem = document.getElementById("interopButton");
+    interopElem.value = "Enable Interop";
+
+    curKernelName = curKernelName.replace("Interop", "");
     mandelbrotCL();
+}
+
+function toogleInterop() {
+    var interopElem;
+
+    interop = !interop;
+    interopElem = document.getElementById("interopButton");
+    if (interop) {
+        interopElem.value = "Disable Interop";
+        curKernelName += "Interop";
+    } else {
+        interopElem.value = "Enable Interop";
+        curKernelName = curKernelName.replace("Interop", "");
+    }
+
+    kernel = program.createKernel(curKernelName);
+    setKernelFirstParameter();
+    if (animation === "stop") {
+        animation = "animate";
+        document.getElementById('runBtn').value = "Stop";
+        anim();
+    }
 }
 
 </script>
@@ -194,5 +257,6 @@ formula<select onchange="setFormula(this.options[this.selectedIndex].value);">
    </select>
 GPU<input type="radio" name="device" id="GPUradio" onclick="toogleDevice('GPU');" checked="true">
 CPU<input type="radio" name="device" id="CPUradio" onclick="toogleDevice('CPU');">
+<input type="button" value="Enable Interop" id="interopButton" onclick="toogleInterop();">
 
 </body></html>

@@ -3,7 +3,7 @@
 // The linearFiltering parameter indicates which type of filtering will be used in WebGL.
 // If true, gl.LINEAR filter will be used, if false gl.NEAREST will be used.
 
-function init_gl( canvas, linearFiltering ) {
+function init_gl(canvas, nx, ny, linearFiltering) {
    gl = canvas.getContext("experimental-webgl");
    if (!gl) {
       alert("Unfortunately your system does not support WebGL");
@@ -11,8 +11,10 @@ function init_gl( canvas, linearFiltering ) {
    }
 
    init_shaders();
-   init_buffers( linearFiltering );
+   init_buffers(linearFiltering, nx, ny);
 }
+
+var texture;
 
 var vertexShaderSrc =
 "  attribute vec2 aPos;"+
@@ -52,7 +54,7 @@ function init_shaders() {
    gl.useProgram(prog);
 }
 
-function init_buffers( linearFiltering ) {
+function init_buffers(linearFiltering, nx, ny) {
    var aPosLoc = gl.getAttribLocation(prog, "aPos");
    var aTexLoc = gl.getAttribLocation(prog, "aTexCoord");
    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
@@ -62,7 +64,8 @@ function init_buffers( linearFiltering ) {
    gl.vertexAttribPointer(aTexLoc, 2, gl.FLOAT, false, 16, 8);
    gl.enableVertexAttribArray( aPosLoc );
    gl.enableVertexAttribArray( aTexLoc );
-   var texture = gl.createTexture();
+
+   texture = gl.createTexture();
    gl.bindTexture(gl.TEXTURE_2D, texture);
    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
    if(linearFiltering) {
@@ -74,10 +77,14 @@ function init_buffers( linearFiltering ) {
    }
    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, nx, ny, 0,
+                 gl.RGBA, gl.UNSIGNED_BYTE, null);
 }
 
-function draw_gl(nx, ny, pixels) {
-   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, nx, ny, 0,
-     gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+function draw_gl(nx, ny, pixels, interop) {
+    if (!interop) {
+       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, nx, ny, 0,
+         gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    }
    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
 }
