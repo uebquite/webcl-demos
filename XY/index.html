@@ -23,6 +23,10 @@ var PIX_GLOBAL_SIZE = new Int32Array([n, n]);
 var IMAGE_ORIGIN = new Int32Array([0, 0, 0]);
 var IMAGE_REGION = new Int32Array([n, n2, 1]);
 
+var interop = false;
+var bufPixTex;
+var program;
+
 function randomSpin() {
     var i;
 
@@ -83,12 +87,24 @@ function draw() {
     kPix.setArg(0, iSpinB);
     kPix.setArg(1, iSpinW);
 
-    cmdQueue.enqueueNDRangeKernel(kPix, null, PIX_GLOBAL_SIZE, SPIN_LOCAL_SIZE);
-    cmdQueue.enqueueReadBuffer(bufPix, true, 0, bufSize, outBuffer);
-    cmdQueue.finish();
-
     try {
-        draw_gl(n, n, outBuffer);
+        if (interop) {
+            kPix.setArg(2, bufPixTex);
+            gl.finish();
+            cmdQueue.enqueueAcquireGLObjects([bufPixTex]);
+            cmdQueue.enqueueNDRangeKernel(kPix, null, PIX_GLOBAL_SIZE,
+                                          SPIN_LOCAL_SIZE);
+            cmdQueue.enqueueReleaseGLObjects([bufPixTex]);
+        } else {
+            kPix.setArg(2, bufPix);
+            cmdQueue.enqueueNDRangeKernel(kPix, null, PIX_GLOBAL_SIZE,
+                                          SPIN_LOCAL_SIZE);
+            cmdQueue.enqueueReadBuffer(bufPix, true, 0, bufSize, outBuffer);
+        }
+
+        cmdQueue.finish();
+
+        draw_gl(n, n, outBuffer, interop);
         frames++;
     } catch (er) {
         console.error(er);
@@ -131,8 +147,10 @@ function fr() {
 function initWebCL() {
     var i;
 
-    try {
+    var canvas = document.getElementById("c");
+    init_gl(canvas, n, n);
 
+    try {
         if (!kernelSrc) {
             kernelSrc = WebCLCommon.loadKernel("kernel.cl");
             if (!kernelSrc) {
@@ -146,8 +164,10 @@ function initWebCL() {
         SPIN_LOCAL_SIZE[0] = 8;
         SPIN_LOCAL_SIZE[1] = useGPU ? 8 : 1;
 
-        var ctx = WebCLCommon.createContext();
-        var program = WebCLCommon.createProgramBuild(kernelSrc);
+        var ctxProperties = {};
+        ctxProperties.extension = "KHR_GL_SHARING";
+        var ctx = WebCLCommon.createContext(ctxProperties);
+        program = WebCLCommon.createProgramBuild(kernelSrc);
         cmdQueue = WebCLCommon.createCommandQueue();
 
         bufRand = ctx.createBuffer(webcl.MEM_READ_WRITE, randByteLength);
@@ -159,6 +179,8 @@ function initWebCL() {
         iSpinW1 = ctx.createImage(webcl.MEM_READ_WRITE, format);
         iTemp   = ctx.createImage(webcl.MEM_READ_WRITE, format);
         bufPix  = ctx.createBuffer(webcl.MEM_WRITE_ONLY, bufSize);
+        bufPixTex = ctx.createFromGLTexture(webcl.MEM_WRITE_ONLY,
+                                                gl.TEXTURE_2D, 0, texture);
 
         kSpinB = program.createKernel("kSpinB");
         kSpinB.setArg(3, bufRand);
@@ -169,7 +191,6 @@ function initWebCL() {
         kSpinW.setArg(4, 1 / T, WebCLKernelArgumentTypes.FLOAT);
 
         kPix = program.createKernel("kPix");
-        kPix.setArg(2, bufPix);
 
         var UIrand = new Uint32Array(randByteLength);
         for (i = 0; i < randByteLength; i++) {
@@ -187,8 +208,6 @@ function initWebCL() {
         throw e;
     }
 
-    var canvas = document.getElementById("c");
-    init_gl(canvas);
     time = new Date().getTime();
     frTimer = setInterval(fr, 500);
     anim();
@@ -205,6 +224,9 @@ function run(v) {
     }
 }
 function reset() {
+    interop = true;
+    toogleInterop();
+
     if (animation === "stop") {
         animation = "reset";
         document.getElementById('runBtn').value = "Stop";
@@ -231,7 +253,29 @@ function setIt(val) {
 function toogleDevice(device) {
     window.clearInterval(frTimer);
     useGPU = (device === 'CPU') ? false : true;
+
+    interop = false;
+    interopElem = document.getElementById("interopButton");
+    interopElem.value = "Enable Interop";
+
     initWebCL();
+}
+
+function toogleInterop() {
+    var interopElem;
+    var kernelName;
+
+    interop = !interop;
+    interopElem = document.getElementById("interopButton");
+    if (interop) {
+        kernelName = "kPixInterop";
+        interopElem.value = "Disable Interop";
+    } else {
+        kernelName = "kPix";
+        interopElem.value = "Enable Interop";
+    }
+
+    kPix = program.createKernel(kernelName);
 }
 
 </script>
@@ -255,6 +299,7 @@ fps<input size="2" id="framerate" />
 
 GPU<input type="radio" name="device" id="GPUradio" onclick="toogleDevice('GPU');" checked="true" />
 CPU<input type="radio" name="device" id="CPUradio" onclick="toogleDevice('CPU');" />
+<input type="button" value="Enable Interop" id="interopButton" onclick="toogleInterop();">
 
 <p>GPU based Monte-Carlo simulation of the XY model on the square 512&times;512
 grid. <i>it</i> is the number of MC iterations per frame.</p>

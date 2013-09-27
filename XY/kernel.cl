@@ -80,3 +80,25 @@ __kernel void kPix(read_only image2d_t sB, read_only image2d_t sW,
     iClamp( 512 - (int)abs(c - 1024) ),
     255);
 }
+
+__kernel void kPixInterop(read_only image2d_t sB, read_only image2d_t sW,
+    write_only image2d_t texOut) {
+  const sampler_t samp =
+    CLK_NORMALIZED_COORDS_FALSE|CLK_ADDRESS_CLAMP|CLK_FILTER_NEAREST;
+  int x = get_global_id(0),  y = get_global_id(1);
+  int y2 = y >> 1;
+  int c;
+  if ( ((x + y) & 1) == 0)
+    c = (int)( read_imagef(sB, samp, (int2)(x, y2) ).x * 1536.0f );
+  else c = (int)( read_imagef(sW, samp, (int2)(x, y2 ) ).x * 1536.0f );
+  float4 pix = (float4)(
+    iClamp( (int)abs(c - 768) - 256 ),
+    iClamp( 512 - (int)abs(c - 512) ),
+    iClamp( 512 - (int)abs(c - 1024) ),
+    255);
+
+    pix.x /= 255; pix.y /= 255;
+    pix.z /= 255; pix.w /= 255;
+
+    write_imagef(texOut, (int2)(x,y), pix);
+}
