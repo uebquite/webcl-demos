@@ -17,11 +17,19 @@ var types = WebCLKernelArgumentTypes;
 var globalWorkSize = new Int32Array([n, n]);
 var localWorkSize = new Int32Array(2);
 
+var interop = false;
+var bufPixTex;
+var program;
+
 window.WebCL = webcl;
 
 function startCL() {
     var output = document.getElementById("output");
     output.innerHTML = "";
+
+    var canvas = document.getElementById("c");
+    init_gl(canvas, n, n, false);
+
     try {
 
         WebCLCommon.init(useGpu ? "GPU" : "CPU");
@@ -29,13 +37,15 @@ function startCL() {
         localWorkSize[0] = 8;
         localWorkSize[1] = useGpu ? 8 : 1;
 
-        var context = WebCLCommon.createContext();
+        var ctxProperties = {};
+        ctxProperties.extension = "KHR_GL_SHARING";
+        var context = WebCLCommon.createContext(ctxProperties);
         var kernelSrc = WebCLCommon.loadKernel("kernel.cl");
         if (!kernelSrc) {
             console.error("ERROR: could not load the kernel file.");
             return;
         }
-        var program = WebCLCommon.createProgramBuild(kernelSrc);
+        program = WebCLCommon.createProgramBuild(kernelSrc);
         cmdQueue = WebCLCommon.createCommandQueue();
 
         D  = context.createBuffer(WebCL.MEM_READ_WRITE, bufferSize);
@@ -47,10 +57,17 @@ function startCL() {
         G  = context.createBuffer(WebCL.MEM_READ_WRITE, bufferSize);
 
         bufPix = context.createBuffer(WebCL.MEM_WRITE_ONLY, bufferSize);
+        bufPixTex = context.createFromGLTexture(webcl.MEM_WRITE_ONLY,
+                                                gl.TEXTURE_2D, 0, texture);
+
         kShow = program.createKernel("kShow");
         kShow.setArg(0, D);
         kShow.setArg(1, bufPix);
-        kAdvec = program.createKernel("kAdvec");
+        if (interop) {
+            kAdvec = program.createKernel("kAdvecInterop");
+        } else {
+            kAdvec = program.createKernel("kAdvec");
+        }
         kForce = program.createKernel("kForce");
         kForce.setArg(3, 0.001 * 0.5 * bu, types.FLOAT);
         kG = program.createKernel("kG");
@@ -92,10 +109,8 @@ function startCL() {
             += "<h3>ERROR:</h3><pre style=\"color:red;\">" + e.message + "</pre>";
         throw e;
     }
-    var canvas = document.getElementById("c");
-    init_gl(canvas, false);
-    outPix = new Uint8Array(4 * n * n);
 
+    outPix = new Uint8Array(4 * n * n);
     frTimer = setInterval(fr, 500);
     time = new Date().getTime();
     animation = "animate";
@@ -103,6 +118,12 @@ function startCL() {
 }
 
 function draw() {
+    if (interop) {
+        kAdvec.setArg(4, bufPixTex);
+        gl.finish();
+        cmdQueue.enqueueAcquireGLObjects([bufPixTex]);
+    }
+
     kAdvec.setArg(0, U);
     kAdvec.setArg(1, D);
     kAdvec.setArg(2, U1);
@@ -151,10 +172,17 @@ function draw() {
     U1 = tmp;
 
     kShow.setArg(0, D);
-    cmdQueue.enqueueNDRangeKernel(kShow, [], globalWorkSize, localWorkSize);
+
+    if (interop) {
+        cmdQueue.enqueueReleaseGLObjects([bufPixTex]);
+    } else {
+        cmdQueue.enqueueNDRangeKernel(kShow, [], globalWorkSize, localWorkSize);
+        cmdQueue.finish();
+        cmdQueue.enqueueReadBuffer(bufPix, true, 0, bufferSize, outPix);
+    }
+
     cmdQueue.finish();
-    cmdQueue.enqueueReadBuffer(bufPix, true, 0, bufferSize, outPix);
-    draw_gl(n, n, outPix);
+    draw_gl(n, n, outPix, interop);
     frames++;
 }
 
@@ -220,6 +248,8 @@ function reset() {
     } else {
         animation = "reset";
     }
+
+    resetCL();
 }
 
 function fr() {
@@ -244,9 +274,39 @@ function setBu(v) {
 }
 
 function resetCL() {
+    var interopElem;
+
     window.clearInterval(frTimer);
+
+    interop = false;
+    interopElem = document.getElementById("interopButton");
+    interopElem.value = "Enable Interop";
+
     startCL();
 }
+
+function toogleInterop() {
+    var interopElem;
+    var kernelName;
+
+    interop = !interop;
+    interopElem = document.getElementById("interopButton");
+    if (interop) {
+        kernelName = "kAdvecInterop";
+        interopElem.value = "Disable Interop";
+    } else {
+        kernelName = "kAdvec";
+        interopElem.value = "Enable Interop";
+    }
+
+    kAdvec = program.createKernel(kernelName);
+    if (animation === "stop") {
+        animation = "animate";
+        document.getElementById('runBtn').value = "Stop";
+        anim();
+    }
+}
+
 
 </script>
 <style type="text/css">
@@ -269,5 +329,6 @@ fps<input type="text" size="3" id="framerate">
 Device:
 <input type="radio" name="r2" id="CPU" onclick="useGpu=false;resetCL();">CPU
 <input type="radio" name="r2" id="GPU" onclick="useGpu=true;resetCL();" checked="true">GPU
+<input type="button" value="Enable Interop" id="interopButton" onclick="toogleInterop();">
 
 </body></html>
