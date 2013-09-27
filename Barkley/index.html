@@ -17,9 +17,15 @@ var types = WebCLKernelArgumentTypes;
 var ctx, program, cmdQueue, platform, kernelSrc;
 var useGPU = true;
 
+var interop = false;
+var bufPixTex;
+
 function CL_prog() {
     data = new Float32Array(bufSize);
     initInputArray(data);
+
+    var canvas = document.getElementById("c");
+    init_gl(canvas, n, n);
 
     kernelSrc = WebCLCommon.loadKernel("kernel.cl");
     if (!kernelSrc) {
@@ -29,8 +35,6 @@ function CL_prog() {
 
     initWebCL();
 
-    var canvas = document.getElementById("c");
-    init_gl(canvas);
     outBuffer = new Uint8Array(bufPixelSize);
     frTimer = setInterval(fr, 500);
     time = new Date().getTime();
@@ -39,13 +43,15 @@ function CL_prog() {
 }
 
 function initWebCL() {
+    var ctxProperties = {};
     var output = document.getElementById("output");
     output.innerHTML = "";
 
     try {
         WebCLCommon.init(useGPU ? "GPU" : "CPU");
-        var ctx = WebCLCommon.createContext();
-        var program = WebCLCommon.createProgramBuild(kernelSrc);
+        ctxProperties.extension = "KHR_GL_SHARING";
+        var ctx = WebCLCommon.createContext(ctxProperties);
+        program = WebCLCommon.createProgramBuild(kernelSrc);
         if (cmdQueue) {
             cmdQueue.finish();
         }
@@ -53,15 +59,12 @@ function initWebCL() {
 
         b0 = ctx.createBuffer(webcl.MEM_READ_WRITE, 4 * bufSize);
         b1 = ctx.createBuffer(webcl.MEM_READ_WRITE, 4 * bufSize);
+        bufPix = ctx.createBuffer(webcl.MEM_WRITE_ONLY, bufPixelSize);
+        bufPixTex = ctx.createFromGLTexture(webcl.MEM_WRITE_ONLY,
+                                                gl.TEXTURE_2D, 0, texture);
 
         kBarkley = program.createKernel("kBarkley");
-        kBarkley.setArg(2, 1 / a, types.FLOAT);
-        kBarkley.setArg(3, b / a, types.FLOAT);
-        kBarkley.setArg(4, dt, types.FLOAT);
-        kBarkley.setArg(5, dt / eps, types.FLOAT);
-        kBarkley.setArg(6, dt / (h * h), types.FLOAT);
 
-        bufPix = ctx.createBuffer(webcl.MEM_WRITE_ONLY, bufPixelSize);
         kShow = program.createKernel("kShow");
         kShow.setArg(1, bufPix);
 
@@ -93,17 +96,36 @@ function initInputArray(inputArray) {
 var globalWorkSize = new Int32Array([n, n]);
 var barkleyOffSets = new Int32Array([1, 1]);
 function draw() {
+
     kBarkley.setArg(0, b0);
     kBarkley.setArg(1, b1);
+    kBarkley.setArg(2, 1 / a, types.FLOAT);
+    kBarkley.setArg(3, b / a, types.FLOAT);
+    kBarkley.setArg(4, dt, types.FLOAT);
+    kBarkley.setArg(5, dt / eps, types.FLOAT);
+    kBarkley.setArg(6, dt / (h * h), types.FLOAT);
+
+    if (interop) {
+        kBarkley.setArg(7, bufPixTex);
+        gl.finish();
+        cmdQueue.enqueueAcquireGLObjects([bufPixTex]);
+    }
+
     cmdQueue.enqueueNDRangeKernel(kBarkley, barkleyOffSets, globalWorkSize, null);
     cmdQueue.enqueueCopyBuffer(b1, b0, 0, 0, 4 * bufSize);
     cmdQueue.finish();
 
-    kShow.setArg(0, b0);
-    cmdQueue.enqueueNDRangeKernel(kShow, 0, globalWorkSize, null);
-    cmdQueue.enqueueReadBuffer(bufPix, true, 0, bufPixelSize, outBuffer);
-    cmdQueue.finish();
-    draw_gl(n, n, outBuffer);
+    if (interop) {
+        cmdQueue.enqueueReleaseGLObjects([bufPixTex]);
+    }
+    else {
+        kShow.setArg(0, b0);
+        cmdQueue.enqueueNDRangeKernel(kShow, 0, globalWorkSize, null);
+        cmdQueue.enqueueReadBuffer(bufPix, true, 0, bufPixelSize, outBuffer);
+        cmdQueue.finish();
+    }
+
+    draw_gl(n, n, outBuffer, interop);
     frames++;
 }
 
@@ -144,6 +166,9 @@ function run(v) {
 }
 
 function reset() {
+    interop = true;
+    toogleInterop();
+
     if (animation === "stop") {
         animation = "reset";
         document.getElementById('runBtn').value = "Stop";
@@ -182,8 +207,32 @@ function setDelay(val) {
 }
 
 function switchDevice() {
+    var interopElem;
+
     window.clearInterval(frTimer);
+
+    interop = false;
+    interopElem = document.getElementById("interopButton");
+    interopElem.value = "Enable Interop";
+
     initWebCL();
+}
+
+function toogleInterop() {
+    var interopElem;
+    var kernelName;
+
+    interop = !interop;
+    interopElem = document.getElementById("interopButton");
+    if (interop) {
+        kernelName = "kBarkleyInterop";
+        interopElem.value = "Disable Interop";
+    } else {
+        kernelName = "kBarkley";
+        interopElem.value = "Enable Interop";
+    }
+
+    kBarkley = program.createKernel(kernelName);
 }
 
 </script>
@@ -204,6 +253,7 @@ delay<input size="1" value="0" onchange="setDelay(this.value);">
 fps<input size="1" id="framerate">
 GPU<input type="radio" name="device" id="GPUradio" onclick="useGPU=true;switchDevice();" checked="true">
 CPU<input type="radio" name="device" id="CPUradio" onclick="useGPU=false;switchDevice();">
+<input type="button" value="Enable Interop" id="interopButton" onclick="toogleInterop();">
 
 <p>Barkley model on <i>512&times;512</i> square grid.
 <i>u, v = 0</i> at the square border. Data are stored in buffers.</p>
