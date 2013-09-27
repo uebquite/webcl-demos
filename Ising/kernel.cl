@@ -30,3 +30,20 @@ __kernel void kPix(read_only image2d_t s, read_only image2d_t s1,
   c *= 255;
   pix[x + n*y] = (uchar4)(c,c,c,255);
 }
+
+__kernel void kPixInterop(read_only image2d_t s, read_only image2d_t s1,
+    write_only image2d_t texOut) {
+  const sampler_t samp =
+    CLK_NORMALIZED_COORDS_FALSE|CLK_ADDRESS_CLAMP|CLK_FILTER_NEAREST;
+  int x = get_global_id(0),  y = get_global_id(1);
+  int c;
+  if ( ((x + y) % 2) == 0) c = read_imagei(s, samp, (int2)(x, y) ).x;
+  else c = read_imagei(s1, samp, (int2)(x, y) ).x;
+  c *= 255;
+
+  float4 pix = (float4)(c,c,c,255);
+    pix.x /= 255; pix.y /= 255;
+    pix.z /= 255; pix.w /= 255;
+
+    write_imagef(texOut, (int2)(x,y), pix);
+}
